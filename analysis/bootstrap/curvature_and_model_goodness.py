@@ -106,13 +106,13 @@ def run(args):
         return batch
 
     surrogate_datasets = produce_surrogate_data(judgments, CONFIG, 1)
-    degree_curvature = 0.1 * np.array([-5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5])
-    results = {'LL': [], 'Curvature': [], 'Curvature of Space': [], 'Sigma': [], 'Dimension': [], 'Subject': [], 'Domain': []}
+    degree_curvature = [-5, -4, -3, -2, -1, -0.8, -0.6, -0.4, -0.2, 0, 0.2, 0.4, 0.6, 0.8, 1, 2, 3, 4, 5]
+    results = {'LL': [], 'Lambda-Mu': [], 'Curvature of Space': [], 'Sigma': [], 'Dimension': [], 'Subject': [], 'Domain': []}
     for data in surrogate_datasets:
         for c in degree_curvature:
             log_likelihood, curvature_val, sigma = fit_model(data, c, CONFIG, dim)
             # write to pandas file
-            results['Curvature'].append(curvature_val)
+            results['Lambda-Mu'].append(curvature_val)
             results['Curvature of Space'].append(curvature_val**2)
             results['LL'].append(log_likelihood)
             results['Sigma'].append(sigma)
@@ -134,6 +134,9 @@ def run(args):
 @timer
 def run_in_parallel(operation, n_iter, workers):
     return workers.map_sync(operation, n_iter)
+
+# NOTE: ########################################
+# Values of lambda and mu are hard-coded inside run function
 
 
 domain = input('Domain: ')
