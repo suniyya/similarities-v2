@@ -136,8 +136,14 @@ def run_in_parallel(operation, n_iter, workers):
     return workers.map_sync(operation, n_iter)
 
 
-domain = 'texture'
-SUBJECTS = ['MC', 'BL', 'SJ', 'SA', 'YCL']
+domain = input('Domain: ')
+SUBJECTS = input('Subjects (separated by spaces): ').split(' ')
+print(SUBJECTS)
+proceed = input('If subjects correct, press "y" to proceed')
+if proceed != 'y':
+    raise IOError
+
+DIM = int(input('Number of Dimensions: '))
 
 client_ids = ipp.Client()
 pool = client_ids[:]
@@ -148,13 +154,13 @@ for subject in SUBJECTS:
                  'experiments/{}_exp/subject-data/preprocessed/{}_{}_exp.json'.format(domain, subject, domain)
     judgments = decompose_similarity_judgments(INPUT_DATA, NAMES_TO_ID)
 
-    DIM = 2
     ARGS = []
 
-    for i in range(2):
+    for i in range(5):
         ARGS.append((i, judgments, CONFIG, subject, domain, DIM))
 
     result = run_in_parallel(run, ARGS, pool)
+
     total_df = pd.concat(result)
     print(total_df)
-    total_df.to_csv('curvature_and_LL_{}-{}_combined.csv'.format(subject, domain))
+    total_df.to_csv('curvature_and_LL_{}-{}-{}_combined.csv'.format(subject, domain, DIM))

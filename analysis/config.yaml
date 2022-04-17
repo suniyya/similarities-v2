@@ -3,7 +3,7 @@
 num_stimuli: 37
 overlap: 2 # do not change unless necessary - controls size of overlapping set of stimuli across two trials
 num_stimuli_per_trial: 8
-path_to_stimulus_list: '/Users/suniyya/Dropbox/Research/Thesis_Work/Psychophysics_Aim1/similarities/experiments/word_exp/stimuli.txt'
+path_to_stimulus_list: '/Users/suniyya/Dropbox/Research/Thesis_Work/Psychophysics_Aim1/similarities-v2/experiments/word_exp/stimuli.txt'
 # Modeling Parameters
 sigmas: 1
 max_trials: 5994
