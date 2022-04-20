@@ -68,28 +68,28 @@ def run(args):
                     sample[trial] += 1
         return sample
 
-    def fit_model(similarity_judgments, curvature, params, dim=2):
+    def fit_model(similarity_judgments, curvature, params, dim, start_points):
         params_copy = copy.deepcopy(params)
         num_judgments = len(similarity_judgments)
         noise = params['sigmas']['compare']
         params_copy['n_dim'] = dim  # ensure correct model is tested
         if curvature == 0:
             # fit Euclidean model
-            x, ll, fmin_costs = rs.points_of_best_fit(similarity_judgments, params_copy)
+            x, ll, fmin_costs = rs.points_of_best_fit(similarity_judgments, params_copy, start_points)
             ll = -1 * ll / (params['num_repeats'] * num_judgments)
         elif curvature > 0:
             # fit spherical model
             curvature_val = curvature
             params_copy['curvature'] = curvature_val
-            x, ll, fmin_costs = rs.spherical_points_of_best_fit(similarity_judgments, params_copy)
+            x, ll, fmin_costs = rs.spherical_points_of_best_fit(similarity_judgments, params_copy, start_points)
             ll = -1 * ll / (params['num_repeats'] * num_judgments)
         else:
             # fit hyperbolic model
             curvature_val = -1 * curvature
             params_copy['curvature'] = curvature_val
-            x, ll, fmin_costs = rs.hyperbolic_points_of_best_fit(similarity_judgments, params_copy)
+            x, ll, fmin_costs = rs.hyperbolic_points_of_best_fit(similarity_judgments, params_copy, start_points)
             ll = -1 * ll / (params['num_repeats'] * num_judgments)
-        return ll, curvature, noise
+        return ll, curvature, noise, x
 
     def produce_surrogate_data(judgments_orig, params, batch_size=1):
         """
@@ -106,11 +106,30 @@ def run(args):
         return batch
 
     surrogate_datasets = produce_surrogate_data(judgments, CONFIG, 1)
-    degree_curvature = [-5, -4, -3, -2, -1, -0.8, -0.6, -0.4, -0.2, 0, 0.2, 0.4, 0.6, 0.8, 1, 2, 3, 4, 5]
+    degree_curvature = [0, 0.2, 0.4, 0.6, 0.8, 1, 2, 3, 4, 5]
+    degree_curvature_h = [0, -0.2, -0.4, -0.6, -0.8, -1, -2, -3, -4, -5]
     results = {'LL': [], 'Lambda-Mu': [], 'Curvature of Space': [], 'Sigma': [], 'Dimension': [], 'Subject': [], 'Domain': []}
     for data in surrogate_datasets:
-        for c in degree_curvature:
-            log_likelihood, curvature_val, sigma = fit_model(data, c, CONFIG, dim)
+        for _c in range(len(degree_curvature)):
+            c = degree_curvature[_c]
+            if _c == 0:
+                start = None
+            log_likelihood, curvature_val, sigma, coords = fit_model(data, c, CONFIG, dim, start)
+            start = coords
+            # write to pandas file
+            results['Lambda-Mu'].append(curvature_val)
+            results['Curvature of Space'].append(curvature_val**2)
+            results['LL'].append(log_likelihood)
+            results['Sigma'].append(sigma)
+            results['Dimension'].append(dim)
+            results['Subject'].append(subject)
+            results['Domain'].append(domain)
+        for _c in range(len(degree_curvature_h)):
+            c = degree_curvature_h[_c]
+            if _c == 0:
+                start = None
+            log_likelihood, curvature_val, sigma, coords = fit_model(data, c, CONFIG, dim, start)
+            start = coords
             # write to pandas file
             results['Lambda-Mu'].append(curvature_val)
             results['Curvature of Space'].append(curvature_val**2)
@@ -121,13 +140,6 @@ def run(args):
             results['Domain'].append(domain)
     # # write df
     df = pd.DataFrame(results)
-    # timestamp = time.asctime().replace(" ", '.')
-    # filename = 'curvature_and_LL_{}-{}_{}_{}.csv'.format(subject, domain, num_iterations, timestamp)
-    # df.to_csv(filename)
-    # plot figure
-    # sns.scatterplot(data=df, x="Curvature", y="LL", hue="Sigma")
-    # plt.ylim([-1, 0])
-    # plt.show()
     return df
 
 
@@ -137,6 +149,7 @@ def run_in_parallel(operation, n_iter, workers):
 
 # NOTE: ########################################
 # Values of lambda and mu are hard-coded inside run function
+# curvature is lambda^2 and mu^2 = 1/R^2 according to definition of Gaussian curvature...
 
 
 domain = input('Domain: ')
