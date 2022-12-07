@@ -17,34 +17,53 @@ class CurvatureHyperbolic(unittest.TestCase):
     def test_visually_if_square_projected_correctly(self):
         fig = plt.figure()
         ax = fig.add_subplot(projection='3d')
-        square_euclidean = np.array([[-1, -1, -1, -1, -1, -0.5, 0, 0.5, 1, 1, 1, 1, 1, 0.5, 0, -0.5],
-                                     [1, 0.5, 0, -0.5, -1, -1, -1, -1, -1, -0.5, 0, 0.5, 1, 1, 1, 1]])
+        square_euclidean = np.array([[-1, -1, -1, -1, -1, -1, -1, -1,
+                                      -0.75, -0.5, -0.25, 0, 0.25, 0.5, 0.75, 1,
+                                      1, 1, 1, 1, 1, 1, 1, 1,
+                                      0.75, 0.5, 0.25, 0, -0.25, -0.5, -0.75],
+                                     [1, 0.75, 0.5, 0, -0.25, -0.5, -0.75, -1,
+                                      -1, -1, -1, -1, -1, -1, -1, -1,
+                                      -0.75, -0.5, -0.25, 0, 0.25, 0.5, 0.75, 1,
+                                      1, 1, 1, 1, 1, 1, 1]])
         plt.plot(square_euclidean[0, :], square_euclidean[1, :], 'o')
-        for _i in [0.01, 0.1, 1, 5, 10, 20]:
-            Y = loid_map(square_euclidean, _i)
-            ax.scatter(Y[1, :], Y[2, :], Y[0, :])
+        for _i in [1]:
+            for _j in [1, 1.5, 2, 2.5, 3, 4]:
+                temp = _j*square_euclidean
+                Y = loid_map(temp, _i)
+                plt.plot(temp[0, :], temp[1, :], 'bo')
+                ax.scatter(Y[1, :], Y[2, :], Y[0, :], color=[0.5, 0.5, 0.7])
         plt.show()
         self.assertTrue(True)
 
     def test_visually_if_random_points_projected_to_sphere_of_correct_radius(self):
         fig = plt.figure()
         ax = fig.add_subplot(projection='3d')
-        rand_dots = 10*np.array([np.random.standard_normal(50), np.random.standard_normal(50)])
-        plt.plot(rand_dots[0, :], rand_dots[1, :], 'ko')
-        for _i in [0.1, 0.5, 1]:
-            Y = sphere_map(rand_dots, 1/_i)
-            ax.scatter(Y[1, :], Y[2, :], Y[0, :])
+        # rand_dots = 10*np.array([np.random.standard_normal(50), np.random.standard_normal(50)])
+        rand_dots = np.array([[0, -1, -1, -1, -1, -1, -1, -1, -1,
+                                      -0.75, -0.5, -0.25, 0, 0.25, 0.5, 0.75, 1,
+                                      1, 1, 1, 1, 1, 1, 1, 1,
+                                      0.75, 0.5, 0.25, 0, -0.25, -0.5, -0.75],
+                                     [0, 1, 0.75, 0.5, 0, -0.25, -0.5, -0.75, -1,
+                                      -1, -1, -1, -1, -1, -1, -1, -1,
+                                      -0.75, -0.5, -0.25, 0, 0.25, 0.5, 0.75, 1,
+                                      1, 1, 1, 1, 1, 1, 1]])
+        rand_dots = rand_dots
+        for _j in [1.1, 1.5,  1.8,  2.2,  3, 4, 5, 6]:
+            plt.plot(rand_dots[0, :]/_j, rand_dots[1, :]/_j, 'bo')
+            for _i in [1]:
+                Y = sphere_map(rand_dots/_j, 1/_i)
+                ax.scatter(Y[1, :], Y[2, :], Y[0, :], color=[0.5, 0.5, 0.7])
 
         max_range = np.array([Y[1, :].max() - Y[1, :].min(), Y[2, :].max() - Y[2, :].min(), Y[0, :].max() - Y[0, :].min()]).max() / 2.0
-        mid_x = (Y[1, :].max() + Y[1, :].min()) * 0.5
-        mid_y = (Y[2, :].max() + Y[2, :].min()) * 0.5
-        mid_z = (Y[0, :].max() + Y[0, :].min()) * 0.5
-        ax.set_xlim(mid_x - max_range, mid_x + max_range)
-        ax.set_ylim(mid_y - max_range, mid_y + max_range)
-        ax.set_zlim(mid_z - max_range, mid_z + max_range)
-        ax.set_xlim(-15, 15)
-        ax.set_ylim(-15, 15)
-        ax.set_zlim(-15, 15)
+        # mid_x = (Y[1, :].max() + Y[1, :].min()) * 0.5
+        # mid_y = (Y[2, :].max() + Y[2, :].min()) * 0.5
+        # mid_z = (Y[0, :].max() + Y[0, :].min()) * 0.5
+        # ax.set_xlim(mid_x - max_range, mid_x + max_range)
+        # ax.set_ylim(mid_y - max_range, mid_y + max_range)
+        # ax.set_zlim(mid_z - max_range, mid_z + max_range)
+        # ax.set_xlim(-15, 15)
+        # ax.set_ylim(-15, 15)
+        # ax.set_zlim(-15, 15)
         plt.show()
         self.assertTrue(True)
 
