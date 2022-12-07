@@ -57,7 +57,7 @@ def run(args):
     num_iterations, judgments, CONFIG, subject, domain, dim, OUTDIR = args
     print(num_iterations)
     degree_curvature = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]
-    degree_curvature_h = [0, -0.1, -0.2, -0.3, -0.4, -0.5, -0.6, -0.7, -0.8, -0.9, -1]
+    degree_curvature_h = [-0.1, -0.2, -0.3, -0.4, -0.5, -0.6, -0.7, -0.8, -0.9, -1]
 
     def sample_judgments(original_judgments, num_repeats):
         """
@@ -122,6 +122,8 @@ def run(args):
             if _c == 0:
                 start = None
             log_likelihood, curvature_val, sigma, coords = fit_model(data, c, CONFIG, dim, start)
+            if c == 0:
+                start_euclidean = coords
             LOG.info("LL: {}".format(log_likelihood))
             LOG.info("Sph fit points: ")
             print(coords)
@@ -145,7 +147,7 @@ def run(args):
         for _c in range(len(degree_curvature_h)):
             c = degree_curvature_h[_c]
             if _c == 0:
-                start = None
+                start = start_euclidean
             log_likelihood, curvature_val, sigma, coords = fit_model(data, c, CONFIG, dim, start)
             LOG.info("LL: {}".format(log_likelihood))
             LOG.info("Hyp fit points: ")
