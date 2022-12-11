@@ -15,41 +15,30 @@ The inputs are
 - max number of iterations to run the model_fitting pipeline with.
 """
 
-import time
-
-import functools
-import ipyparallel as ipp
+import pprint
+import copy
+import logging
+import numpy as np
+from analysis.model_fitting import run_mds_seed as rs
 import pandas as pd
-
 from analysis.model_fitting.model_fitting import decompose_similarity_judgments
 from analysis.util import read_in_params
 
+logging.basicConfig(level=logging.INFO)
+LOG = logging.getLogger(__name__)
 
 CONFIG, STIMULI, NAMES_TO_ID, ID_TO_NAME = read_in_params()
-
-
-def timer(func):
-    @functools.wraps(func)
-    def wrapper_timer(*args, **kwargs):
-        tic = time.perf_counter()
-        value = func(*args, **kwargs)
-        toc = time.perf_counter()
-        elapsed_time = toc - tic
-        print(f"Elapsed time: {elapsed_time:0.4f} seconds")
-        return value
-
-    return wrapper_timer
+# disable unneeded params
+CONFIG['curvature'] = None
+CONFIG['spherical'] = None
+CONFIG['hyperbolic'] = None
 
 
 def run(args):
-    import copy
-    import time
-    import numpy as np
-    import pandas as pd
-    from analysis.model_fitting import run_mds_seed as rs
-
-    num_iterations, judgments, CONFIG, subject, domain, dim = args
-    print(num_iterations)
+    num_it, judgments, CONFIG, subject, domain, dim, OUTDIR = args
+    print(num_it)
+    degree_curvature = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]
+    degree_curvature_h = [-0.1, -0.2, -0.3, -0.4, -0.5, -0.6, -0.7, -0.8, -0.9, -1]
 
     def sample_judgments(original_judgments, num_repeats):
         """
@@ -71,7 +60,7 @@ def run(args):
     def fit_model(similarity_judgments, curvature, params, dim, start_points):
         params_copy = copy.deepcopy(params)
         num_judgments = len(similarity_judgments)
-        noise = params['sigmas']['compare']
+        noise = np.sqrt(params['sigmas']['compare'] ** 2 + params['sigmas']['dist'] ** 2)
         params_copy['n_dim'] = dim  # ensure correct model is tested
         if curvature == 0:
             # fit Euclidean model
@@ -100,57 +89,82 @@ def run(args):
         @return:
         """
         batch = []
-        for i in range(batch_size):
+        for _ in range(batch_size):
             new_judgments = sample_judgments(judgments_orig, params['num_repeats'])
             batch.append(new_judgments)
         return batch
 
     surrogate_datasets = produce_surrogate_data(judgments, CONFIG, 1)
-    degree_curvature = [0, 0.2, 0.4, 0.6, 0.8, 1, 2, 3, 4, 5]
-    degree_curvature_h = [0, -0.2, -0.4, -0.6, -0.8, -1, -2, -3, -4, -5]
-    results = {'LL': [], 'Lambda-Mu': [], 'Curvature of Space': [], 'Sigma': [], 'Dimension': [], 'Subject': [], 'Domain': []}
+    results = {'LL': [], 'Lambda-Mu': [], 'Curvature of Space': [], 'Sigma': [], 'Dimension': [], 'Subject': [],
+               'Domain': []}
     for data in surrogate_datasets:
+        start_euclidean = None
         for _c in range(len(degree_curvature)):
             c = degree_curvature[_c]
             if _c == 0:
                 start = None
             log_likelihood, curvature_val, sigma, coords = fit_model(data, c, CONFIG, dim, start)
+            if c == 0:
+                start_euclidean = coords
+            LOG.info("LL: {}".format(log_likelihood))
+            LOG.info("Sph fit points: ")
+            print(coords)
+            outfilename = '{}/{}_{}_spherical_model_coords_sigma_{}_dim_{}_mu_{}_{}'.format(
+                OUTDIR,
+                subject, domain,
+                str(CONFIG['sigmas']['compare'] + CONFIG['sigmas']['dist']),
+                dim,
+                curvature_val,
+                num_it
+            )
+            np.save(outfilename, coords)
             start = coords
             # write to pandas file
             results['Lambda-Mu'].append(curvature_val)
-            results['Curvature of Space'].append(curvature_val**2)
+            results['Curvature of Space'].append(curvature_val ** 2)
             results['LL'].append(log_likelihood)
             results['Sigma'].append(sigma)
             results['Dimension'].append(dim)
             results['Subject'].append(subject)
             results['Domain'].append(domain)
+            pprint.pprint(results)
         for _c in range(len(degree_curvature_h)):
             c = degree_curvature_h[_c]
             if _c == 0:
-                start = None
+                start = start_euclidean
             log_likelihood, curvature_val, sigma, coords = fit_model(data, c, CONFIG, dim, start)
+            LOG.info("LL: {}".format(log_likelihood))
+            LOG.info("Hyp fit points: ")
+            print(coords)
+            outfilename = '{}/{}_{}_hyperbolic_model_coords_sigma_{}_dim_{}_lambda_{}_{}'.format(
+                OUTDIR,
+                subject, domain,
+                str(CONFIG['sigmas']['compare'] + CONFIG['sigmas']['dist']),
+                dim,
+                curvature_val,
+                num_it
+            )
+            np.save(outfilename, coords)
             start = coords
             # write to pandas file
             results['Lambda-Mu'].append(curvature_val)
-            results['Curvature of Space'].append(curvature_val**2)
+            results['Curvature of Space'].append(curvature_val ** 2)
             results['LL'].append(log_likelihood)
             results['Sigma'].append(sigma)
             results['Dimension'].append(dim)
             results['Subject'].append(subject)
             results['Domain'].append(domain)
+            pprint.pprint(results)
     # # write df
     df = pd.DataFrame(results)
     return df
 
 
-@timer
-def run_in_parallel(operation, n_iter, workers):
-    return workers.map_sync(operation, n_iter)
-
 # NOTE: ########################################
 # Values of lambda and mu are hard-coded inside run function
 # curvature is lambda^2 and mu^2 = 1/R^2 according to definition of Gaussian curvature...
 
+print(CONFIG)
 
 domain = input('Domain: ')
 SUBJECTS = input('Subjects (separated by spaces): ').split(' ')
@@ -160,9 +174,9 @@ if proceed != 'y':
     raise IOError
 
 DIM = int(input('Number of Dimensions: '))
+OUTDIR = input('Output directory for LLs and coordinates: ')
+NUM_SURROGATES = int(input('Number of surrogate data sets to make and fit: '))
 
-client_ids = ipp.Client()
-pool = client_ids[:]
 
 for subject in SUBJECTS:
     print(subject)
@@ -170,13 +184,12 @@ for subject in SUBJECTS:
                  'experiments/{}_exp/subject-data/preprocessed/{}_{}_exp.json'.format(domain, subject, domain)
     judgments = decompose_similarity_judgments(INPUT_DATA, NAMES_TO_ID)
 
-    ARGS = []
+    dfs = []
+    for i in range(NUM_SURROGATES):
+        ARGS = (i, judgments, CONFIG, subject, domain, DIM, OUTDIR)
+        result = run(ARGS)
+        dfs.append(result)
 
-    for i in range(5):
-        ARGS.append((i, judgments, CONFIG, subject, domain, DIM))
-
-    result = run_in_parallel(run, ARGS, pool)
-
-    total_df = pd.concat(result)
+    total_df = pd.concat(dfs)
     print(total_df)
-    total_df.to_csv('curvature_and_LL_{}-{}-{}_combined.csv'.format(subject, domain, DIM))
+    total_df.to_csv('{}/curvature_and_LL_{}-{}-{}_combined.csv'.format(OUTDIR, subject, domain, DIM))

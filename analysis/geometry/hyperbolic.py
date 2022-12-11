@@ -53,6 +53,21 @@ def loid_map(X, degree_curvature):
     return Y
 
 
+def loid_to_poincare_map(X):
+    # NEED TO TEST
+    """ Map points in Loid hyperboiloid to points on the Poincare disk.
+    @param X: d+1 by n matrix with n points of dimension d in Rd (real numbers, d dim)
+    @return Y: d by n matrix with n points projected onto the hyperboloid of dimension d, which is embedded in
+    d+1-dimensional space
+    """
+    # retain coordinates of X but add a 0-th coordinate which is a function of the d-dimensional coordinate values
+    d, n = X.shape
+    Y = zeros((d-1, n))
+    for p in range(n):
+        Y[:, p] = (1/(1+X[0, p])) * X[1:, p]
+    return Y
+
+
 def hyperbolic_distances(X, curvature):
     """
     Computes the hyperblic distance between points ON the hyperboloid.

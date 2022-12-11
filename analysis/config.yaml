@@ -7,15 +7,15 @@ path_to_stimulus_list: '/Users/suniyya/Dropbox/Research/Thesis_Work/Psychophysic
 # Modeling Parameters
 sigmas: 1
 max_trials: 5994
-model_dimensions: [1, 2, 3, 4, 5]
+model_dimensions: [1, 2, 3, 4, 5, 6, 7]
 num_repeats: 5
 epsilon: 1e-30
 minimization: 'gradient-descent'
 tolerance: 1e-6
 fatol: 1e-5
-max_iterations: 5000
+max_iterations: 30000
 learning_rate: 0.05 # was 0.01
 # Non-Euclidean Parameters
-curvature: 1
+curvature: 0
 hyperbolic: False
-spherical: True
+spherical: False
