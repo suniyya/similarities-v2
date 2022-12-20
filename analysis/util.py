@@ -3,6 +3,7 @@ Some utilities to help with processing psychophysical data files
 """
 import yaml
 import json
+from scipy.io import savemat
 import glob
 import numpy as np
 from itertools import combinations
@@ -29,7 +30,7 @@ def stimulus_id_to_name():
     return id_to_name
 
 
-def read_file(subject, preprocessed_data_dir):
+def read_json_file(subject, preprocessed_data_dir):
     files = glob.glob('{}/{}_*.json'.format(preprocessed_data_dir, subject))
     if len(files) == 0:
         raise FileNotFoundError
@@ -155,3 +156,19 @@ def read_in_params():
             stimulus_names(),
             stimulus_name_to_id(),
             stimulus_id_to_name())
+
+
+def combine_model_npy_files_to_mat(directory, subject, outdir='.', min_dim=1, max_dim=7):
+    domains = ['texture', 'intermediate_texture', 'intermediate_object', 'image', 'word',
+               'texture_grayscale', 'texture_color']
+    data = {'stim_labels': stimulus_names()}
+    for domain in domains:
+        data[domain] = {}
+        for d in range(min_dim, max_dim+1):
+            model_files = glob.glob("{}/{}/{}/{}_{}_anchored_points_sigma_*_dim_{}.npy".format(
+                directory, domain, subject, subject, domain, d
+            ))
+            if len(model_files) > 0:
+                model_file = model_files[0]
+                data[domain]["dim{}".format(d)] = np.array(np.load(model_file))
+    savemat("{}/{}.mat".format(outdir, subject), data)
