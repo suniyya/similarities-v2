@@ -5,7 +5,7 @@ Take in files in json format and look through it
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from analysis.util import all_distance_pairs, read_file, ranking_to_pairwise_comparisons
+from analysis.util import all_distance_pairs, read_json_file, ranking_to_pairwise_comparisons
 from matplotlib import pyplot as plt
 from itertools import combinations
 
@@ -14,7 +14,7 @@ def read_all_files(subjects, data_dir):
     # Keys are "subject,experiment", e.g. "MC,word"
     rank_judgments_by_subject = {}
     for subject in subjects:
-        rank_judgments_by_subject[subject] = read_file(subject, data_dir)
+        rank_judgments_by_subject[subject] = read_json_file(subject, data_dir)
     return rank_judgments_by_subject
 
 
@@ -156,11 +156,13 @@ def context_effects_heatmap(subs, data, annotate=True):
         prob_in_context_ab = prob_in_context_ab / float(context_trials_count)
         print('NUMBER OF CONTEXT TRIADS: ' + str(context_trials_count))
         print(prob_in_context_ab)
+
         ratio_map = np.zeros((6, 6))
         for k in range(6):
             for j in range(6):
                 independent_prob = sum(prob_in_context_ab[k, :]) * sum(prob_in_context_ab[:, j])
                 ratio_map[k, j] = prob_in_context_ab[k, j] / independent_prob
+
         sns.heatmap(ratio_map, square=True,
                     xticklabels=[0, None, None, None, None, 1], annot=annotate,
                     yticklabels=[0, None, None, None, None, 1], cmap="bwr", center=1,
@@ -232,4 +234,5 @@ if __name__ == '__main__':
     subject_comparison_heatmap(SUBJECTS, ALL_DATA)
 
     # Create context effects heatmaps
-    context_effects_heatmap(SUBJECTS, ALL_DATA, annotate=False)
+    #context_effects_heatmap(SUBJECTS, ALL_DATA, annotate=False)
+    context_effects_heatmap(['MC'], ALL_DATA, annotate=False)
