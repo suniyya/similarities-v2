@@ -1,6 +1,9 @@
 import numpy as np
 import seaborn as sns
+from scipy.io import loadmat
 import matplotlib.pyplot as plt
+
+from analysis.geometry.procrustes_distance import get_consensus_pts
 from analysis.util import stimulus_names
 from sklearn.decomposition import PCA
 from matplotlib import cm
@@ -10,7 +13,7 @@ from matplotlib.cbook import get_sample_data
 from matplotlib.colors import ListedColormap, LinearSegmentedColormap
 
 
-def stretch_axes(points):
+def do_pca(points, num_pcs=5):
     """
     Run PCA.
     Stretch axes so as to make the variance along each axis the same.
@@ -18,14 +21,10 @@ def stretch_axes(points):
     This way points along each axis will have unit variance. This does not affect the radial
     distribution of points, only their distance from the origin in different directions.
     """
-    n_components = 5
+    n_components = num_pcs
     pca = PCA(n_components=n_components)
     # obtain the 5 PC directions and project data onto that space
     temp = pca.fit_transform(points)
-    # normalize each axis by its standard deviation to make sd across each axis the same
-    # do not stretch axes
-    # for i in range(n_components):
-    #     temp[:, i] = temp[:, i] / np.std(temp[:, i])
     points = temp
     return points
 
@@ -109,8 +108,9 @@ def scatterplots_2d_colored(subject_name, subject_exp_data, pc1=1, pc2=2, colorb
 def scatterplots_2d_image_annotated(subject_name, subject_exp_data, image_source, sigma, pc1=1, pc2=2,
                                     divide_by_sigma=True):
     SubjectId = {'MC': 'S1', 'BL': 'S2', 'EFV': 'S3', 'SJ': 'S4', 'SAW': 'S5', 'NK': 'S6', 'YCL': 'S7', 'SA': 'S8',
-                 'JF': 'S9', 'AJ': 'S10', 'SN': 'S11', 'ZK': 'S12', 'CME': 'S13'}
-    sns.set_style('darkgrid')
+                 'JF': 'S9', 'AJ': 'S10', 'SN': 'S11', 'ZK': 'S12', 'CME': 'S13', 'consensus': 'consensus'}
+    if subject_name != 'consensus':
+        sns.set_style('darkgrid')
     stimuli = stimulus_names()
 
     if divide_by_sigma:
@@ -166,6 +166,9 @@ if __name__ == '__main__':
                     'intermediate_object': 'animal_intermediates/image-like-opaque',
                     'intermediate_texture': 'animal_intermediates/texture-like-opaque',
                     'texture': 'animal_textures/textures_big_checks'}
-    data = np.load(PATH_TO_NPY_FILE)
-    data = stretch_axes(data)
+    if NAME.lower() == 'consensus':
+        data = get_consensus_pts(EXP)
+    else:
+        data = np.load(PATH_TO_NPY_FILE)
+    data = do_pca(data)
     scatterplots_2d_image_annotated(NAME, data, image_source[EXP], SIGMA)
