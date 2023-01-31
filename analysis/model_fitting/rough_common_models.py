@@ -335,7 +335,7 @@ for s in sub_by_domain['word']:
 
 # after null dists and proc distances made^
 
-from analysis.perceptual_space_visualizations import stretch_axes
+from analysis.perceptual_space_visualizations import do_pca
 
 a, b, c = proc.procrustes(sub_data['word']['SA'], avg_data['word'])
 pca = PCA(n_components=n_components)
