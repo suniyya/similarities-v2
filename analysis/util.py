@@ -159,6 +159,14 @@ def read_in_params():
 
 
 def combine_model_npy_files_to_mat(directory, subject, outdir='.', min_dim=1, max_dim=7):
+    """
+    @param directory: input dir - dir in which is a domain dir then a subject dir
+    @param subject:
+    @param outdir:
+    @param min_dim:
+    @param max_dim:
+    @return:
+    """
     domains = ['texture', 'intermediate_texture', 'intermediate_object', 'image', 'word',
                'texture_grayscale', 'texture_color']
     data = {'stim_labels': stimulus_names()}
