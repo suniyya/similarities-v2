@@ -12,6 +12,7 @@ from scipy.spatial.distance import pdist, squareform
 import analysis.geometry.euclidean as model
 import analysis.simulation.experiment as exp
 import analysis.simulation.experiment_ranking as exp_ranking
+from analysis.simulation.simulate_coord_noise import run_experiment as coord_noise_run_exp
 import analysis.model_fitting.pairwise_likelihood_analysis as an
 import analysis.model_fitting.run_mds_seed as rs
 from analysis.geometry.hyperbolic import loid_map, hyperbolic_distances, sphere_map, spherical_distances
@@ -37,7 +38,7 @@ def simulate_judgments(parameters, points):
 
     if parameters['paradigm'] == 'pairwise_comparisons':
         judgments, points = exp.run_experiment(points, distances, parameters)
-    elif parameters['paradigm'] == 'simple_ranking':
+    elif parameters['paradigm'] == 'simple_ranking' and parameters['decision_noise_type'] != 'coordinates':
         data = exp_ranking.run_experiment(points, distances, parameters, simple_err_model=True)
         judgments = {}
         for trial, responses in data.items():
@@ -49,6 +50,10 @@ def simulate_judgments(parameters, points):
                 else:
                     judgments[pair] += judgment
                     judgments[pair] = judgments[pair] / float(2)
+    elif parameters['decision_noise_type'] == 'coordinates':
+        # simple ranking trials. Noise only at level of coords not dist or comparison.
+        print('simulating judgments with coord noise')
+        judgments = coord_noise_run_exp(points, parameters)
     else:
         raise NotImplementedError('Invalid paradigm')
     return judgments, distances
@@ -97,7 +102,7 @@ def main(true_dim, parameters, min_model=1, max_model=5, show=False):
     # calculate log-likelihood, is_bad flag
     probs = an.find_probabilities(
         interstim_distances, trial_pairs_a, trial_pairs_b,
-        parameters['sigmas'], parameters['no_noise'])
+        np.sqrt(parameters['sigmas']['dist']**2 + parameters['sigmas']['compare']**2), parameters['no_noise'])
     ll_groundtruth = an.calculate_ll(
         judgment_counts, probs, parameters['num_repeats'], parameters['epsilon'])[0] / float(
         num_trials * parameters['num_repeats'])
@@ -200,6 +205,7 @@ def helper(ii):
             'num_repeats': args.repetitions,
             'sigmas': {'compare': CONFIG['sigmas'], 'dist': 0},
             'paradigm': args.paradigm,
+            'decision_noise_type': args.decision_noise,
             'true_geometry': args.geometry,
             'curvature': CONFIG['curvature'],
             'dist_metric': 'euclidean',
@@ -223,21 +229,25 @@ if __name__ == '__main__':
     print(CONFIG)
     # ask for and parse user input
     parser = argparse.ArgumentParser()
-    parser.add_argument("-it", "--iterations", type=int, default=1)
+    parser.add_argument("-it", "--iterations", type=int, default=4)
     parser.add_argument("-n", "--num_stimuli", type=int, default=37)
-    parser.add_argument("-g", "--geometry", choices=["euclidean", "hyperbolic", "spherical"], default="spherical")
+    parser.add_argument("-g", "--geometry", choices=["euclidean", "hyperbolic", "spherical"], default="euclidean")
     parser.add_argument("-d1", "--min_model_dim", choices=[1, 2, 3, 4, 5], type=int, default=3)
-    parser.add_argument("-d2", "--max_model_dim", choices=[1, 2, 3, 4, 5], type=int, default=1)
-    parser.add_argument("-t1", "--min_true_dim", choices=[2, 3, 4, 5], type=int, default=2)
-    parser.add_argument("-t2", "--max_true_dim", choices=[2, 3, 4, 5], type=int, default=2)
+    parser.add_argument("-d2", "--max_model_dim", choices=[1, 2, 3, 4, 5], type=int, default=3)
+    parser.add_argument("-t1", "--min_true_dim", choices=[2, 3, 4, 5], type=int, default=3)
+    parser.add_argument("-t2", "--max_true_dim", choices=[2, 3, 4, 5], type=int, default=3)
     parser.add_argument("-r", "--repetitions", help="Number of times to repeat a trial", type=int, default=5)
     parser.add_argument("-s", "--sampling", choices=["uniform", "spherical_shell", "gaussian"],
                         default="gaussian"),
     parser.add_argument("-p", "--paradigm", choices=["pairwise_comparisons", "simple_ranking"],
                         default="simple_ranking")
+    parser.add_argument("-dn", "--decision_noise", choices=["comparison", "coordinates"],
+                        default="coordinates")
     args = parser.parse_args()
 
     LOG.info("Running simulation with arguments: {}".format(args))
+    if args.decision_noise == 'coordinates' and args.geometry != 'euclidean':
+        raise NotImplementedError('Coordinate level noise has only been implemented for Euclidean distance metric!')
 
     pool = Pool(1)
     iterations = range(args.iterations)

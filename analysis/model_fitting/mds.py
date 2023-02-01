@@ -44,9 +44,9 @@ def heuristic_distances(judgments, repeats):
     distance = {}
     for comparison, count in judgments.items():
         increment(win, comparison[0], count)
-        increment(loss, comparison[0], repeats - count)
+        increment(loss, comparison[0], repeats[comparison] - count)
         increment(loss, comparison[-1], count)
-        increment(win, comparison[-1], repeats - count)
+        increment(win, comparison[-1], repeats[comparison] - count)
 
     # map win, loss values to distances
     for pair in win:

@@ -45,7 +45,7 @@ def main(true_dim, parameters, min_model=1, max_model=5, show=False):
     LOG.info('################  True Dimension: {}'.format(true_dim))
     space = model.EuclideanSpace(true_dim)
     true_model = str(true_dim) + 'D'
-    points = space.get_samples(parameters['num_stimuli'], 2, parameters['sampling_method'])
+    points = space.get_samples(parameters['num_stimuli'], MAGNITUDE, parameters['sampling_method'])
     # simulate trialwise judgments based on input paradigm etc.
     pairwise_judgments = simulate_judgments(parameters, points)
 
@@ -130,6 +130,7 @@ def helper(ii):
 
 
 if __name__ == '__main__':
+    MAGNITUDE = 2  # used in main()
     # define valid args
     with open('./analysis/config.yaml', "r") as stream:
         CONFIG = yaml.safe_load(stream)

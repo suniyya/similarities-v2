@@ -19,6 +19,7 @@ But if sigma_point > 0, then the noise is the square root of a sum of squares of
 Gaussian distributions, which is not exactly Gaussian. So erf is merely an approximation of the probability,
 since it only accounts for Gaussian sources of noise.
 """
+import yaml
 import logging
 import numpy as np
 from numpy import sqrt, zeros, concatenate, log2
@@ -27,9 +28,10 @@ from scipy.spatial.distance import pdist, squareform
 
 logging.basicConfig(level=logging.INFO)
 LOG = logging.getLogger(__name__)
-# with open('./analysis/config.yaml', "r") as stream:
-#     data = yaml.safe_load(stream)
-#     EPSILON = float(data['epsilon'])
+
+with open('./analysis/config.yaml', "r") as stream:
+    data = yaml.safe_load(stream)
+    EPSILON = float(data['epsilon'])
 
 
 def params_to_points(x0, num_stimuli, n_dim):
@@ -78,7 +80,7 @@ def points_to_params(points):
     return params
 
 
-def calculate_ll(counts, probs, num_repeats, epsilon):
+def calculate_ll(counts, probs, num_repeats):
     reverse_counts = num_repeats - counts
     reverse_probs = 1 - probs
 
@@ -92,19 +94,19 @@ def calculate_ll(counts, probs, num_repeats, epsilon):
         model_bad = True
 
     # make sure there are no zero probabilities (avoid log(0) error)
-    probs[prob_zero] += epsilon
+    probs[prob_zero] += EPSILON
     log_likelihood = counts.dot(log2(probs))
     return log_likelihood, model_bad
 
 
-def dist_model_ll_vectorized(pair_a, pair_b, judgment_counts, params, stimuli):
+def dist_model_ll_vectorized(pair_a, pair_b, judgment_counts, judgment_repeats, params, stimuli):
     """ Get the likelihood using probabilities from erf geometry, i.e. the geometry
     that takes into account noise as Gaussian sources. """
     # get geometry probabilities and join counts and geometry prob for each trial (N, p)
     interstimulus_distances = squareform(pdist(stimuli))
     probs = find_probabilities(interstimulus_distances, pair_a, pair_b, params['noise_st_dev'], params['no_noise'])
     # calculate log-likelihood, is_bad flag
-    return calculate_ll(judgment_counts, probs, params['num_repeats'], params['epsilon'])
+    return calculate_ll(judgment_counts, probs, judgment_repeats)
 
 
 def find_probabilities(distances, pair_a, pair_b, noise_st_dev, no_noise=False):
@@ -125,31 +127,34 @@ def find_probabilities(distances, pair_a, pair_b, noise_st_dev, no_noise=False):
     return probabilities
 
 
-def random_choice_ll(judgments, params):
+def random_choice_ll(judgments, judgment_repeats):
     """ LL is calculated as sum over trials of N(i>j)*P(i>j).
     In this case the P(i> j) for any i or j is 0.5.
     So we sum N*0.5 """
     counts = []
     probs = []
-    for v in judgments.values():
+    repeats = []
+    for (k, v) in judgments.items():
         counts.append(v)
         probs.append(0.5)
-    return calculate_ll(np.array(counts), np.array(probs), params['num_repeats'], params['epsilon'])
+        repeats.append(judgment_repeats[k])
+    return calculate_ll(np.array(counts), np.array(probs), np.array(repeats))
 
 
-def best_model_ll(judgments, params):
+def best_model_ll(judgments, judgment_repeats):
     """ Use probabilities from observed judgements to calculate likelihood. So if i> j
     2/5 times, prob = 0.4. """
-    num_repeats = float(params['num_repeats'])
     counts = []
     probs = []
-    for v in judgments.values():
+    repeats = []
+    for (k, v) in judgments.items():
         counts.append(v)
-        probs.append(v / num_repeats)
-    return calculate_ll(np.array(counts), np.array(probs), num_repeats, params['epsilon'])
+        probs.append(v / judgment_repeats[k])
+        repeats.append(judgment_repeats[k])
+    return calculate_ll(np.array(counts), np.array(probs), np.array(repeats))
 
 
-def cost_of_model_fit(stimulus_params, pair_a, pair_b, judgment_counts, params):
+def cost_of_model_fit(stimulus_params, pair_a, pair_b, judgment_counts, judgment_repeats, params):
     """
     Stimulus_params is the independent variable. LL is the dependent variable.
     :param stimulus_params: nonzero coordinates of each of the stimuli stretched into one vector
@@ -162,7 +167,7 @@ def cost_of_model_fit(stimulus_params, pair_a, pair_b, judgment_counts, params):
     # get points from params
     points = params_to_points(stimulus_params, params['num_stimuli'], params['n_dim'])
     # calculate likelihood using distance geometry and given points
-    ll, is_bad = dist_model_ll_vectorized(pair_a, pair_b, judgment_counts, params, points)
+    ll, is_bad = dist_model_ll_vectorized(pair_a, pair_b, judgment_counts, judgment_repeats, params, points)
     LOG.debug('geometry is good: {}'.format(not is_bad))
     if is_bad:
         LOG.info("WARNING: This model is infeasible.")

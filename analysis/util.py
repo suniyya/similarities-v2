@@ -57,14 +57,15 @@ def all_distance_pairs(trial_key):
 def ranking_to_pairwise_comparisons(distance_pairs, ranked_stimuli):
     """ Convert ranking data to comparisons of pairs of pairs of stimuli
 
-    @param distance_pairs: kkk
+    @param distance_pairs:
     :type distance_pairs: list
-    :param ranked_stimuli: kj
+    :param ranked_stimuli:
     :type ranked_stimuli: list
     """
     # ranked_stimuli is a list of lists. each list is a 'repeat'
     rank = {}
     comparisons = {}
+    num_repeats = {}
     for stimulus_list in ranked_stimuli:
         for index in range(len(stimulus_list)):
             rank[stimulus_list[index]] = index
@@ -74,13 +75,15 @@ def ranking_to_pairwise_comparisons(distance_pairs, ranked_stimuli):
             stim2 = dists[1].split(',')[1]
             if pair not in comparisons:
                 comparisons[pair] = 1 if rank[stim1] < rank[stim2] else 0
+                num_repeats[pair] = 1
             else:
+                num_repeats[pair] += 1
                 if rank[stim1] < rank[stim2]:
                     comparisons[pair] += 1
-    return comparisons
+    return comparisons, num_repeats
 
 
-def judgments_to_arrays(judgments_dict):
+def judgments_to_arrays(judgments_dict, repeats):
     """Instead of having trials be a dictionary with keys made of tuples,
     convert judgment keys and values into numpy arrays for faster operations """
     # the indices of the stimuli for each trial's "first" pair of stimuli
@@ -88,7 +91,8 @@ def judgments_to_arrays(judgments_dict):
     # the indices of the stimuli for each trial's "second" pair of stimuli
     second_pair = np.array([np.array(trial[-1]) for trial in judgments_dict.keys()])
     comparison_counts = np.array([v for k, v in judgments_dict.items()], dtype='float')
-    return first_pair, second_pair, comparison_counts
+    comparison_repeats = np.array([repeats[k] for k, v in judgments_dict.items()], dtype='float')
+    return first_pair, second_pair, comparison_counts, comparison_repeats
 
 
 def reformat_key(comparison_trial_key):
