@@ -10,37 +10,10 @@ from scipy.spatial.distance import pdist
 import analysis.model_fitting.mds as mds
 import analysis.model_fitting.run_mds_seed as rs
 import analysis.model_fitting.pairwise_likelihood_analysis as an
-from analysis.util import ranking_to_pairwise_comparisons, all_distance_pairs, read_in_params
+from analysis.util import read_in_params, json_to_pairwise_choice_probs
 
 logging.basicConfig(level=logging.INFO)
 LOG = logging.getLogger(__name__)
-
-# take processed experiment responses (in json format) from the appropriate folder
-
-
-def decompose_similarity_judgments(filepath, names_to_id):
-    with open(filepath) as file:
-        ranking_responses_by_trial = json.load(file)
-
-    # break up ranking responses into pairwise judgments
-    pairwise_comparison_responses_by_trial = {}
-    for config in ranking_responses_by_trial:
-        comparisons = ranking_to_pairwise_comparisons(all_distance_pairs(config),
-                                                      ranking_responses_by_trial[config]
-                                                      )
-        for key, count in comparisons.items():
-            pairs = key.split('<')
-            stim1, stim2 = pairs[1].split(',')
-            stim3, stim4 = pairs[0].split(',')
-            new_key = ((names_to_id[stim1], names_to_id[stim2]), (names_to_id[stim3], names_to_id[stim4]))
-            if new_key not in pairwise_comparison_responses_by_trial:
-                pairwise_comparison_responses_by_trial[new_key] = count
-            else:
-                # if the comparison is repeated in two trials (context design side-effect)
-                pairwise_comparison_responses_by_trial[new_key] += count
-                pairwise_comparison_responses_by_trial[new_key] = pairwise_comparison_responses_by_trial[
-                                                                      new_key] / 2.0
-    return pairwise_comparison_responses_by_trial
 
 
 if __name__ == '__main__':
@@ -70,29 +43,8 @@ if __name__ == '__main__':
         raise InterruptedError
 
     for ii in range(ITERATIONS):
-        # read json file into dict
-        with open(FILEPATH) as file:
-            ranking_responses_by_trial = json.load(file)
-
         # break up ranking responses into pairwise judgments
-        pairwise_comparison_responses = {}
-        pairwise_comparison_num_repeats = {}
-        for config in ranking_responses_by_trial:
-            comparisons, num_repeats = ranking_to_pairwise_comparisons(all_distance_pairs(config),
-                                                                       ranking_responses_by_trial[config]
-                                                                       )
-            for key, count in comparisons.items():
-                pairs = key.split('<')
-                stim1, stim2 = pairs[1].split(',')
-                stim3, stim4 = pairs[0].split(',')
-                new_key = ((NAMES_TO_ID[stim1], NAMES_TO_ID[stim2]), (NAMES_TO_ID[stim3], NAMES_TO_ID[stim4]))
-                if new_key not in pairwise_comparison_responses:
-                    pairwise_comparison_responses[new_key] = count
-                    pairwise_comparison_num_repeats[new_key] = num_repeats[key]
-                else:
-                    # if the comparison is repeated in two trials (context design side-effect)
-                    pairwise_comparison_responses[new_key] += count
-                    pairwise_comparison_num_repeats[new_key] += num_repeats[key]
+        pairwise_comparison_responses, pairwise_comparison_num_repeats = json_to_pairwise_choice_probs(FILEPATH)
         # get MDS starting coordinates
         D = mds.format_distances(mds.heuristic_distances(
             pairwise_comparison_responses, pairwise_comparison_num_repeats))

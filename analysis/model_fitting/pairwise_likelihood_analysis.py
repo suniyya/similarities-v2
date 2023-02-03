@@ -19,12 +19,15 @@ But if sigma_point > 0, then the noise is the square root of a sum of squares of
 Gaussian distributions, which is not exactly Gaussian. So erf is merely an approximation of the probability,
 since it only accounts for Gaussian sources of noise.
 """
+import json
+
 import yaml
 import logging
 import numpy as np
 from numpy import sqrt, zeros, concatenate, log2
 from scipy.special import erf
 from scipy.spatial.distance import pdist, squareform
+import analysis.util as util
 
 logging.basicConfig(level=logging.INFO)
 LOG = logging.getLogger(__name__)
@@ -119,7 +122,7 @@ def find_probabilities(distances, pair_a, pair_b, noise_st_dev, no_noise=False):
     """
     difference = distances[pair_a[:, 0], pair_a[:, 1]] - distances[pair_b[:, 0], pair_b[:, 1]]
     if noise_st_dev == 0 or no_noise is True:
-    # if (sigmas['compare'] + sigmas['dist'] == 0) or no_noise is True:
+        # if (sigmas['compare'] + sigmas['dist'] == 0) or no_noise is True:
         probabilities = (difference < 0) * 0 + (difference > 0) * 1 + (difference == 0) * 0.5
     else:
         # total_st_dev = sqrt((sigmas['dist'] ** 2) + sigmas['compare'] ** 2)
@@ -163,6 +166,7 @@ def cost_of_model_fit(stimulus_params, pair_a, pair_b, judgment_counts, judgment
     :param judgment_counts: counts per pairwise comparison (array)
     :param params: global params for the exp includes sigmas, num_repeats, n_dim etc.
     :return: negative log-likelihood (return -LL so the minimum -LL can be found)
+    @param judgment_repeats:
     """
     # get points from params
     points = params_to_points(stimulus_params, params['num_stimuli'], params['n_dim'])
@@ -172,3 +176,22 @@ def cost_of_model_fit(stimulus_params, pair_a, pair_b, judgment_counts, judgment
     if is_bad:
         LOG.info("WARNING: This model is infeasible.")
     return -1 * ll
+
+
+def log_likelihood_of_choice_probs(json_file_path, path_to_npy_file, noise_st_dev):
+    """
+    Calculate LL of choice probabilities given a set of coordinates. Can be used to recalculate LLs
+    or explain one subject's LLs using another's perceptual space model, or explain one domain from another's model.
+    """
+    # break up ranking responses into pairwise judgments
+    pairwise_responses, pairwise_num_repeats = util.json_to_pairwise_choice_probs(json_file_path)
+    pairs_a, pairs_b, response_counts, comp_repeats = util.judgments_to_arrays(pairwise_responses, pairwise_num_repeats)
+    points = np.load(path_to_npy_file)
+    params = {'noise_st_dev': noise_st_dev, 'no_noise': False}
+    num_triads = sum([pairwise_num_repeats[k] for k in pairwise_responses.keys()])
+    # calculate likelihood using distance geometry and given points
+    ll, is_bad = dist_model_ll_vectorized(pairs_a, pairs_b, response_counts, comp_repeats, params, points)
+    LOG.debug('geometry is good: {}'.format(not is_bad))
+    if is_bad:
+        LOG.info("WARNING: This model is infeasible.")
+    return ll / num_triads

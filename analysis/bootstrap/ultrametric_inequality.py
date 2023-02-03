@@ -14,9 +14,8 @@ In order to fully make sense of any results arising from this, it would be good 
 import numpy as np
 from scipy.spatial.distance import pdist, squareform
 from analysis.geometry.euclidean import EuclideanSpace as space
-from analysis.util import read_in_params
+from analysis.util import read_in_params, json_to_pairwise_choice_probs
 import matplotlib.pyplot as plt
-from analysis.model_fitting.model_fitting import decompose_similarity_judgments
 import analysis.model_fitting.mds as mds
 from itertools import combinations, permutations
 
@@ -127,7 +126,7 @@ for d in range(len(domains)):
     domain = domains[d]
     INPUT_DATA = '/Users/suniyya/Dropbox/Research/Thesis_Work/Psychophysics_Aim1/experiments/' \
                  'experiments/{}_exp/subject-data/preprocessed/{}_{}_exp.json'.format(domain, subject, domain)
-    judgments = decompose_similarity_judgments(INPUT_DATA, NAMES_TO_ID)
+    judgments, repeats = json_to_pairwise_choice_probs(INPUT_DATA)
 
     ultrametricity = []
     triangle_inequality = []

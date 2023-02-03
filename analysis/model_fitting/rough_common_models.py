@@ -15,7 +15,7 @@ comparing pairs of subjects and their chocie probabilities.
 """
 
 
-from analysis.model_fitting.model_fitting import decompose_similarity_judgments
+from analysis.util import json_to_pairwise_choice_probs
 from pairwise_likelihood_analysis import calculate_ll, best_model_ll
 
 import logging
@@ -70,7 +70,7 @@ def average_subject_choice_probs(domain):
 
     for subject in SUBJECTS_BY_DOMAIN[DOMAIN]:
         file = PATH.format(DIRECTORY, DOMAIN, subject, DOMAIN)
-        data[subject] = decompose_similarity_judgments(file, NAMES_TO_ID)
+        data[subject], repeats = json_to_pairwise_choice_probs(file)
 
     # get average choice probabilities
     data['average'] = average_dict([data[sub] for sub in SUBJECTS_BY_DOMAIN[DOMAIN]])
@@ -83,7 +83,7 @@ def average_subject_choice_probs(domain):
     return minus1, data
 
 
-def calculate_model_lls(minus1, choice_prob_dict, domain, subjects_by_domain):
+def calculate_model_lls(minus1, choice_prob_dict, repeats, domain, subjects_by_domain):
     results = {'Domain': [], 'Subject': [], 'LL': [], 'Model': [], 'Best LL': []}
     params = {
         'num_repeats': 5,
@@ -96,15 +96,16 @@ def calculate_model_lls(minus1, choice_prob_dict, domain, subjects_by_domain):
         minus1_probs = []
         for k, v in choice_prob_dict[subject].items():
             counts.append(v)
-            avg_probs.append(choice_prob_dict['average'][k] / params['num_repeats'])
-            minus1_probs.append(minus1[subject][k] / params['num_repeats'])
+            avg_probs.append(choice_prob_dict['average'][k] / repeats[k])
+            minus1_probs.append(minus1[subject][k] / repeats[k])
 
         # calculate best model LL
         best_ll = best_model_ll(choice_prob_dict[subject], params)[0]
         best_ll = best_ll / (num_judgments * params['num_repeats'])
 
-        ll = calculate_ll(np.array(counts), np.array(avg_probs), params['num_repeats'], params['epsilon'])[0]
-        ll = ll / (num_judgments * params['num_repeats'])
+        ll = calculate_ll(np.array(counts), np.array(avg_probs), repeats)[0]
+        num_triads = sum([repeats[k] for k in choice_prob_dict.keys()])
+        ll = ll / num_triads
         results['Domain'].append(domain)
         results['Subject'].append(subject)
         results['LL'].append(ll)
@@ -112,7 +113,7 @@ def calculate_model_lls(minus1, choice_prob_dict, domain, subjects_by_domain):
         results['Best LL'].append(best_ll)
 
         # calculate n-1 model LL
-        ll = calculate_ll(np.array(counts), np.array(minus1_probs), params['num_repeats'], params['epsilon'])[0]
+        ll = calculate_ll(np.array(counts), np.array(minus1_probs))[0]
         ll = ll / (num_judgments * params['num_repeats'])
         results['Domain'].append(domain)
         results['Subject'].append(subject)
@@ -275,103 +276,103 @@ if __name__ == '__main__':
                                   ii))
 
 
-############# COmmon model Procrustes  analysis
-from scipy.linalg import orthogonal_procrustes as orth_proc
-
-avg_word = np.load(
-    '/Users/suniyya/Dropbox/Research/Thesis_Work/Psychophysics_Aim1/geometric-modeling/common-model/average/word/average_word_anchored_points_sigma_0.1_dim_5.npy')
-mc_word = np.load(
-    '/Users/suniyya/Dropbox/Research/Thesis_Work/Psychophysics_Aim1/geometric-modeling/euclidean/word/MC/MC_word_anchored_points_sigma_0.18_dim_5.npy')
-mc_word = np.load(
-    '/Users/suniyya/Dropbox/Research/Thesis_Work/Psychophysics_Aim1/geometric-modeling/euclidean/word/MC/MC_word_anchored_points_sigma_0.18_dim_5.npy')
-ss
-Input
-In[10]
-mc_word = np.load(
-    '/Users/suniyya/Dropbox/Research/Thesis_Work/Psychophysics_Aim1/geometric-modeling/euclidean/word/MC/MC_word_anchored_points_sigma_0.18_dim_5.npy')
-ss
-^
-SyntaxError: invalid
-syntax
-path_5d = '/Users/suniyya/Dropbox/Research/Thesis_Work/Psychophysics_Aim1/geometric-modeling/euclidean/{}/{}/{}_{}_anchored_points_sigma_0.18_dim_5.npy'
-path_avg = '/Users/suniyya/Dropbox/Research/Thesis_Work/Psychophysics_Aim1/geometric-modeling/common-model/average/{}/average_{}_anchored_points_sigma_0.1_dim_5.npy'
-domains = ['texture', 'intermediate_texture', 'intermediate_object', 'image', 'word']
-subjects = ['MC', 'BL', 'EFV', 'SJ', 'SAW', 'NK', 'YCL', 'SA', 'JF']
-sub_data = {}
-for d in domains:
-    sub_data[d] = {}
-sub_by_domain = {'texture': ['MC', 'BL', 'EFV', 'SJ', 'SAW', 'JF', 'YCL', 'SA'],
-                 'intermediate_texture': ['MC', 'BL', 'EFV', 'SJ', 'SAW', 'JF', 'YCL', 'SA'],
-                 'intermediate_object': ['MC', 'BL', 'EFV', 'SJ', 'SAW', 'NK', 'YCL', 'SA'],
-                 'image': ['MC', 'BL', 'EFV', 'SJ', 'SAW', 'NK', 'YCL', 'SA'],
-                 'word': ['MC', 'BL', 'EFV', 'SJ', 'SAW', 'JF', 'YCL', 'SA']}
-for d in domains:
-    for s in sub_by_domain[d]:
-        path = path_5d.format(d, s, s, d)
-        sub_data[d][s] = np.load(path)
-avg_data = {}
-for d in domains:
-    path = path_avg.format(d, d)
-    avg_data[d] = np.load(path)
-
-a, b, c = orth_proc(avg_data['word'], sub_data['word']['MC'])
-
-a, b, c=proc.procrustes(avg_data['word'], sub_data['word']['JF'])
-for r in range(1000):
-    points = np.random.rand(37, 5)
-    a, b, c = proc.procrustes(points, avg_data['word'])
-    proc_d.append(c)
-
-
-for s in sub_by_domain['word']:
-    a, b, cost = proc.procrustes(avg_data['word'], sub_data['word'][s])
-    plt.plot([cost, cost], [0, 300], c='r')
-    if s =='YCL':
-        plt.text(cost, 265, s)
-    elif s == 'SAW':
-        plt.text(cost, 285, s)
-    else:
-        plt.text(cost, 275, s)
-
-# after null dists and proc distances made^
-
-from analysis.perceptual_space_visualizations import do_pca
-
-a, b, c = proc.procrustes(sub_data['word']['SA'], avg_data['word'])
-pca = PCA(n_components=n_components)
-# obtain the 5 PC directions and project data onto that space
-bl_w = pca.fit_transform(a)
-avg_ws = pca.fit_transform(b)
-plt.scatter(avg_ws[:, 0], avg_ws[:, 1], c='k')
-plt.scatter(bl_w[:, 0], bl_w[:, 1], c='b')
-for _ in range(37):
-    plt.plot([bl_w[_, 0], avg_ws[_, 0]], [bl_w[_, 1], avg_ws[_, 1]], 'k-')
-
-plt.scatter(bl_w[:, 0], bl_w[:, 1], c='b')
-plt.scatter(avg_ws[:, 0], avg_ws[:, 1], c='k')
-plt.axis('square')
-
-
-
-####### visualiz what transformation would comprise of in 2D
-### do PCA - don't stretch or normalize axes. Do same for common model and plot. Visually see if scaling and or rotation needed
-n_components = 5
-domain = 'texture'
-pca = PCA(n_components=n_components)
-# obtain the 5 PC directions and project data onto that space
-temp = pca.fit_transform(avg_data[domain])
-
-tempsub = {}
-
-for sub in sub_by_domain[domain]:
-    tempsub[sub] = pca.fit_transform(sub_data[domain][sub])
-
-for i in range(len(sub_by_domain[domain])):
-    sub = sub_by_domain[domain][i]
-    plt.subplot(1, 8, i)
-    plt.plot(tempsub[sub][:, 0], tempsub[sub][:, 1], 'b.')
-    plt.plot(temp[:, 0], temp[:, 1], 'k.')
-    plt.axis('square')
-    plt.xlim([-2, 2])
-    plt.ylim([-2, 2])
-    plt.title(sub)
+# ############# COmmon model Procrustes  analysis
+# from scipy.linalg import orthogonal_procrustes as orth_proc
+#
+# avg_word = np.load(
+#     '/Users/suniyya/Dropbox/Research/Thesis_Work/Psychophysics_Aim1/geometric-modeling/common-model/average/word/average_word_anchored_points_sigma_0.1_dim_5.npy')
+# mc_word = np.load(
+#     '/Users/suniyya/Dropbox/Research/Thesis_Work/Psychophysics_Aim1/geometric-modeling/euclidean/word/MC/MC_word_anchored_points_sigma_0.18_dim_5.npy')
+# mc_word = np.load(
+#     '/Users/suniyya/Dropbox/Research/Thesis_Work/Psychophysics_Aim1/geometric-modeling/euclidean/word/MC/MC_word_anchored_points_sigma_0.18_dim_5.npy')
+# ss
+# Input
+# In[10]
+# mc_word = np.load(
+#     '/Users/suniyya/Dropbox/Research/Thesis_Work/Psychophysics_Aim1/geometric-modeling/euclidean/word/MC/MC_word_anchored_points_sigma_0.18_dim_5.npy')
+# ss
+# ^
+# SyntaxError: invalid
+# syntax
+# path_5d = '/Users/suniyya/Dropbox/Research/Thesis_Work/Psychophysics_Aim1/geometric-modeling/euclidean/{}/{}/{}_{}_anchored_points_sigma_0.18_dim_5.npy'
+# path_avg = '/Users/suniyya/Dropbox/Research/Thesis_Work/Psychophysics_Aim1/geometric-modeling/common-model/average/{}/average_{}_anchored_points_sigma_0.1_dim_5.npy'
+# domains = ['texture', 'intermediate_texture', 'intermediate_object', 'image', 'word']
+# subjects = ['MC', 'BL', 'EFV', 'SJ', 'SAW', 'NK', 'YCL', 'SA', 'JF']
+# sub_data = {}
+# for d in domains:
+#     sub_data[d] = {}
+# sub_by_domain = {'texture': ['MC', 'BL', 'EFV', 'SJ', 'SAW', 'JF', 'YCL', 'SA'],
+#                  'intermediate_texture': ['MC', 'BL', 'EFV', 'SJ', 'SAW', 'JF', 'YCL', 'SA'],
+#                  'intermediate_object': ['MC', 'BL', 'EFV', 'SJ', 'SAW', 'NK', 'YCL', 'SA'],
+#                  'image': ['MC', 'BL', 'EFV', 'SJ', 'SAW', 'NK', 'YCL', 'SA'],
+#                  'word': ['MC', 'BL', 'EFV', 'SJ', 'SAW', 'JF', 'YCL', 'SA']}
+# for d in domains:
+#     for s in sub_by_domain[d]:
+#         path = path_5d.format(d, s, s, d)
+#         sub_data[d][s] = np.load(path)
+# avg_data = {}
+# for d in domains:
+#     path = path_avg.format(d, d)
+#     avg_data[d] = np.load(path)
+#
+# a, b, c = orth_proc(avg_data['word'], sub_data['word']['MC'])
+#
+# a, b, c=proc.procrustes(avg_data['word'], sub_data['word']['JF'])
+# for r in range(1000):
+#     points = np.random.rand(37, 5)
+#     a, b, c = proc.procrustes(points, avg_data['word'])
+#     proc_d.append(c)
+#
+#
+# for s in sub_by_domain['word']:
+#     a, b, cost = proc.procrustes(avg_data['word'], sub_data['word'][s])
+#     plt.plot([cost, cost], [0, 300], c='r')
+#     if s =='YCL':
+#         plt.text(cost, 265, s)
+#     elif s == 'SAW':
+#         plt.text(cost, 285, s)
+#     else:
+#         plt.text(cost, 275, s)
+#
+# # after null dists and proc distances made^
+#
+# from analysis.perceptual_space_visualizations import do_pca
+#
+# a, b, c = proc.procrustes(sub_data['word']['SA'], avg_data['word'])
+# pca = PCA(n_components=n_components)
+# # obtain the 5 PC directions and project data onto that space
+# bl_w = pca.fit_transform(a)
+# avg_ws = pca.fit_transform(b)
+# plt.scatter(avg_ws[:, 0], avg_ws[:, 1], c='k')
+# plt.scatter(bl_w[:, 0], bl_w[:, 1], c='b')
+# for _ in range(37):
+#     plt.plot([bl_w[_, 0], avg_ws[_, 0]], [bl_w[_, 1], avg_ws[_, 1]], 'k-')
+#
+# plt.scatter(bl_w[:, 0], bl_w[:, 1], c='b')
+# plt.scatter(avg_ws[:, 0], avg_ws[:, 1], c='k')
+# plt.axis('square')
+#
+#
+#
+# ####### visualiz what transformation would comprise of in 2D
+# ### do PCA - don't stretch or normalize axes. Do same for common model and plot. Visually see if scaling and or rotation needed
+# n_components = 5
+# domain = 'texture'
+# pca = PCA(n_components=n_components)
+# # obtain the 5 PC directions and project data onto that space
+# temp = pca.fit_transform(avg_data[domain])
+#
+# tempsub = {}
+#
+# for sub in sub_by_domain[domain]:
+#     tempsub[sub] = pca.fit_transform(sub_data[domain][sub])
+#
+# for i in range(len(sub_by_domain[domain])):
+#     sub = sub_by_domain[domain][i]
+#     plt.subplot(1, 8, i)
+#     plt.plot(tempsub[sub][:, 0], tempsub[sub][:, 1], 'b.')
+#     plt.plot(temp[:, 0], temp[:, 1], 'k.')
+#     plt.axis('square')
+#     plt.xlim([-2, 2])
+#     plt.ylim([-2, 2])
+#     plt.title(sub)

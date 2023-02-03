@@ -95,27 +95,28 @@ def judgments_to_arrays(judgments_dict, repeats):
     return first_pair, second_pair, comparison_counts, comparison_repeats
 
 
-def reformat_key(comparison_trial_key):
-    names_to_ids = stimulus_name_to_id()
-    stim_pair1, stim_pair2 = comparison_trial_key.split('<')
-    stim1, stim2 = stim_pair1.split(',')
-    stim3, stim4 = stim_pair2.split(',')
-    return (names_to_ids[stim3], names_to_ids[stim4]), '>', (names_to_ids[stim1], names_to_ids[stim2])
+# def reformat_key(comparison_trial_key):
+#     names_to_ids = stimulus_name_to_id()
+#     stim_pair1, stim_pair2 = comparison_trial_key.split('<')
+#     stim1, stim2 = stim_pair1.split(',')
+#     stim3, stim4 = stim_pair2.split(',')
+#     return (names_to_ids[stim3], names_to_ids[stim4]), '>', (names_to_ids[stim1], names_to_ids[stim2])
 
 
-def json_to_choice_probabilities(json_contents, to_index=False):
-    choice_probabilities = {}
-    for trial, rankings in json_contents.items():
-        pairs = all_distance_pairs(trial)
-        within_trial_comparisons = ranking_to_pairwise_comparisons(pairs, rankings)
-        for choice in pairs:
-            reformatted_choice = reformat_key(choice) if to_index else choice
-            if reformatted_choice not in choice_probabilities:
-                choice_probabilities[reformatted_choice] = within_trial_comparisons[choice]/5.0
-            else:   # should only be some cases where a trial is repeated once - only once
-                choice_probabilities[reformatted_choice] = (within_trial_comparisons[choice]/5.0 +
-                                                            choice_probabilities[reformatted_choice])/2.0
-    return choice_probabilities
+# Should remove from use  - averages context trial probs - should not...
+# def json_to_choice_probabilities(json_contents, to_index=False):
+#     choice_probabilities = {}
+#     for trial, rankings in json_contents.items():
+#         pairs = all_distance_pairs(trial)
+#         within_trial_comparisons = ranking_to_pairwise_comparisons(pairs, rankings)
+#         for choice in pairs:
+#             reformatted_choice = reformat_key(choice) if to_index else choice
+#             if reformatted_choice not in choice_probabilities:
+#                 choice_probabilities[reformatted_choice] = within_trial_comparisons[choice]/5.0
+#             else:   # should only be some cases where a trial is repeated once - only once
+#                 choice_probabilities[reformatted_choice] = (within_trial_comparisons[choice]/5.0 +
+#                                                             choice_probabilities[reformatted_choice])/2.0
+#     return choice_probabilities
 
 
 def write_npy(outfilename, array):
@@ -176,7 +177,7 @@ def combine_model_npy_files_to_mat(directory, subject, outdir='.', min_dim=1, ma
     data = {'stim_labels': stimulus_names()}
     for domain in domains:
         data[domain] = {}
-        for d in range(min_dim, max_dim+1):
+        for d in range(min_dim, max_dim + 1):
             model_files = glob.glob("{}/{}/{}/{}_{}_anchored_points_sigma_*_dim_{}.npy".format(
                 directory, domain, subject, subject, domain, d
             ))
@@ -184,3 +185,30 @@ def combine_model_npy_files_to_mat(directory, subject, outdir='.', min_dim=1, ma
                 model_file = model_files[0]
                 data[domain]["dim{}".format(d)] = np.array(np.load(model_file))
     savemat("{}/{}.mat".format(outdir, subject), data)
+
+
+def json_to_pairwise_choice_probs(filepath):
+    names_to_id = stimulus_name_to_id()
+    with open(filepath) as file:
+        ranking_responses_by_trial = json.load(file)
+
+    # break up ranking responses into pairwise judgments
+    pairwise_comparison_responses = {}
+    pairwise_comparison_num_repeats = {}
+    for config in ranking_responses_by_trial:
+        comparisons, num_repeats = ranking_to_pairwise_comparisons(all_distance_pairs(config),
+                                                                   ranking_responses_by_trial[config]
+                                                                   )
+        for key, count in comparisons.items():
+            pairs = key.split('<')
+            stim1, stim2 = pairs[1].split(',')
+            stim3, stim4 = pairs[0].split(',')
+            new_key = ((names_to_id[stim1], names_to_id[stim2]), (names_to_id[stim3], names_to_id[stim4]))
+            if new_key not in pairwise_comparison_responses:
+                pairwise_comparison_responses[new_key] = count
+                pairwise_comparison_num_repeats[new_key] = num_repeats[key]
+            else:
+                # if the comparison is repeated in two trials (context design side-effect)
+                pairwise_comparison_responses[new_key] += count
+                pairwise_comparison_num_repeats[new_key] += num_repeats[key]
+    return pairwise_comparison_responses, pairwise_comparison_num_repeats
