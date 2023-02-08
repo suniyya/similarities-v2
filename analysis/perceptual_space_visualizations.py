@@ -116,7 +116,7 @@ def scatterplots_2d_image_annotated(subject_name, subject_exp_data, image_source
     if divide_by_sigma:
         subject_exp_data = subject_exp_data / sigma
     fig, ax = plt.subplots()
-    plt.scatter(subject_exp_data[:, pc1 - 1], subject_exp_data[:, pc2 - 1], c="#31505A", marker='.')
+    plt.scatter(subject_exp_data[:, pc1 - 1], subject_exp_data[:, pc2 - 1], c="#31505A", marker='.', s=5)
     # add labels to points
     label_idx = 0
     for x, y in zip(subject_exp_data[:, pc1 - 1], subject_exp_data[:, pc2 - 1]):
@@ -124,8 +124,9 @@ def scatterplots_2d_image_annotated(subject_name, subject_exp_data, image_source
             plt.annotate(stimuli[label_idx],  # this is the text
                          (x, y),  # this is the point to label
                          textcoords="offset points",  # how to position the text
-                         xytext=(0, 1.5),  # distance from text to points (x,y)
-                         size=8,
+                         xytext=(np.random.normal(0.5, 3), np.random.normal(-0.5, 3)), # distance from text to points (x,y)
+                         size=10,
+                         alpha=0.55,
                          ha='center')  # horizontal alignment can be left, right or center
             label_idx += 1
         else:
