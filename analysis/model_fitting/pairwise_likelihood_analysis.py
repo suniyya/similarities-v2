@@ -182,6 +182,8 @@ def log_likelihood_of_choice_probs(json_file_path, path_to_npy_file, noise_st_de
     """
     Calculate LL of choice probabilities given a set of coordinates. Can be used to recalculate LLs
     or explain one subject's LLs using another's perceptual space model, or explain one domain from another's model.
+    Also include best and random LLs
+    returns a tuple: LL, random LL and best LL
     """
     # break up ranking responses into pairwise judgments
     pairwise_responses, pairwise_num_repeats = util.json_to_pairwise_choice_probs(json_file_path)
@@ -194,4 +196,6 @@ def log_likelihood_of_choice_probs(json_file_path, path_to_npy_file, noise_st_de
     LOG.debug('geometry is good: {}'.format(not is_bad))
     if is_bad:
         LOG.info("WARNING: This model is infeasible.")
-    return ll / num_triads
+    rand_ll = random_choice_ll(pairwise_responses, pairwise_num_repeats)[0]
+    best_ll = best_model_ll(pairwise_responses, pairwise_num_repeats)[0]
+    return ll / num_triads, rand_ll / num_triads, best_ll / num_triads
