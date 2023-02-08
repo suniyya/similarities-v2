@@ -212,3 +212,44 @@ def json_to_pairwise_choice_probs(filepath):
                 pairwise_comparison_responses[new_key] += count
                 pairwise_comparison_num_repeats[new_key] += num_repeats[key]
     return pairwise_comparison_responses, pairwise_comparison_num_repeats
+
+
+def write_choice_probs_to_mat(filepath, outdir, outfilename):
+    responses_dict, n_repeats = json_to_pairwise_choice_probs(filepath)
+    first_pair, second_pair, comparison_counts, comparison_repeats = judgments_to_arrays(responses_dict, n_repeats)
+    stim_list = stimulus_names()
+    responses_col_names = ['ref', 's1', 's2', 'N(D(ref, s1) > D(ref, s2))', 'N_Repeats(D(ref, s1) > D(ref, s2))']
+    num_comparisons = len(first_pair)
+    # hold (ref, s1, s2) tuples with labels instead of numbers
+    ref_name = []
+    s1_name = []
+    s2_name = []
+
+    responses = np.zeros((num_comparisons, len(responses_col_names)))
+
+    for i in range(num_comparisons):
+        ref = [s for s in first_pair[i] if s in second_pair[i]]
+        if len(ref) != 1:
+            raise ValueError('Expected one element in common. Just one ref')
+        responses[i, 0] = ref[0]
+        s1 = [s for s in first_pair[i] if s != ref[0]][0]
+        responses[i, 1] = s1
+        s2 = [s for s in second_pair[i] if s != ref[0]][0]
+        responses[i, 2] = s2
+        responses[i, 3] = comparison_counts[i]
+        responses[i, 4] = comparison_repeats[i]
+        # record names of ref, s1 and s2 for the curre
+        # nt comparison trial
+        ref_name.append(stim_list[ref[0]])
+        s1_name.append(stim_list[s1])
+        s2_name.append(stim_list[s2])
+
+    data = {
+        'stim_list': stim_list,
+        'ref_name': ref_name,
+        's1_name': s1_name,
+        's2_name': s2_name,
+        'responses_colnames': responses_col_names,
+        'responses': responses
+    }
+    savemat("{}/{}.mat".format(outdir, outfilename), data)
