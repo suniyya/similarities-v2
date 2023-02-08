@@ -214,7 +214,16 @@ def json_to_pairwise_choice_probs(filepath):
     return pairwise_comparison_responses, pairwise_comparison_num_repeats
 
 
-def write_choice_probs_to_mat(filepath, outdir, outfilename):
+def write_choice_probs_to_mat(filepath, outdir, outfilename, include_names=False):
+    """
+    In output mat file, in responses matrix, ref, s1 and s2 go from 1-37 or 1-25 in JV's experiments.
+    Because Matlab has 1-indexing this is better - allows indexing stim_list more natural.
+    @param include_names:
+    @param filepath: path to exp.json file with rank judgments
+    @param outdir: directory to write mat file in
+    @param outfilename: name of output file. May include subject and/ or condition and/ or num_sessions information
+    @return:
+    """
     responses_dict, n_repeats = json_to_pairwise_choice_probs(filepath)
     first_pair, second_pair, comparison_counts, comparison_repeats = judgments_to_arrays(responses_dict, n_repeats)
     stim_list = stimulus_names()
@@ -231,11 +240,11 @@ def write_choice_probs_to_mat(filepath, outdir, outfilename):
         ref = [s for s in first_pair[i] if s in second_pair[i]]
         if len(ref) != 1:
             raise ValueError('Expected one element in common. Just one ref')
-        responses[i, 0] = ref[0]
+        responses[i, 0] = ref[0] + 1
         s1 = [s for s in first_pair[i] if s != ref[0]][0]
-        responses[i, 1] = s1
+        responses[i, 1] = s1 + 1
         s2 = [s for s in second_pair[i] if s != ref[0]][0]
-        responses[i, 2] = s2
+        responses[i, 2] = s2 + 1
         responses[i, 3] = comparison_counts[i]
         responses[i, 4] = comparison_repeats[i]
         # record names of ref, s1 and s2 for the curre
@@ -246,10 +255,11 @@ def write_choice_probs_to_mat(filepath, outdir, outfilename):
 
     data = {
         'stim_list': stim_list,
-        'ref_name': ref_name,
-        's1_name': s1_name,
-        's2_name': s2_name,
         'responses_colnames': responses_col_names,
         'responses': responses
     }
+    if include_names:
+        data['ref_name'] = ref_name
+        data['s1_name'] = s1_name
+        data['s2_name'] = s2_name
     savemat("{}/{}.mat".format(outdir, outfilename), data)
