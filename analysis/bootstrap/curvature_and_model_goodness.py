@@ -97,7 +97,7 @@ def run(args):
     #     return batch
 
     # surrogate_datasets = produce_surrogate_data(judgments, CONFIG, 1)
-    results = {'LL': [], 'Lambda-Mu': [], 'Curvature of Space': [], 'Sigma': [], 'Dimension': [], 'Subject': [],
+    results = {'Log Likelihood': [], 'Lambda-Mu': [], 'Curvature of Space': [], 'Sigma': [], 'Dimension': [], 'Subject': [],
                'Domain': []}
     start_euclidean = None
     for _c in range(len(degree_curvature)):
@@ -107,7 +107,7 @@ def run(args):
         log_likelihood, curvature_val, sigma, coords = fit_model(judgments, repeats, c, CONFIG, dim, start)
         if c == 0:
             start_euclidean = coords
-        LOG.info("LL: {}".format(log_likelihood))
+        LOG.info("Log Likelihood: {}".format(log_likelihood))
         LOG.info("Sph fit points: ")
         print(coords)
         outfilename = '{}/{}_{}_spherical_model_coords_sigma_{}_dim_{}_mu_{}'.format(
@@ -122,7 +122,7 @@ def run(args):
         # write to pandas file
         results['Lambda-Mu'].append(curvature_val)
         results['Curvature of Space'].append(curvature_val ** 2)
-        results['LL'].append(log_likelihood)
+        results['Log Likelihood'].append(log_likelihood)
         results['Sigma'].append(sigma)
         results['Dimension'].append(dim)
         results['Subject'].append(subject)
@@ -133,7 +133,7 @@ def run(args):
         if _c == 0:
             start = start_euclidean
         log_likelihood, curvature_val, sigma, coords = fit_model(judgments, repeats, c, CONFIG, dim, start)
-        LOG.info("LL: {}".format(log_likelihood))
+        LOG.info("Log Likelihood: {}".format(log_likelihood))
         LOG.info("Hyp fit points: ")
         print(coords)
         outfilename = '{}/{}_{}_hyperbolic_model_coords_sigma_{}_dim_{}_lambda_{}'.format(
@@ -148,7 +148,7 @@ def run(args):
         # write to pandas file
         results['Lambda-Mu'].append(curvature_val)
         results['Curvature of Space'].append(curvature_val ** 2)
-        results['LL'].append(log_likelihood)
+        results['Log Likelihood'].append(log_likelihood)
         results['Sigma'].append(sigma)
         results['Dimension'].append(dim)
         results['Subject'].append(subject)
@@ -189,4 +189,4 @@ for subject in SUBJECTS:
 
     total_df = pd.concat(dfs)
     print(total_df)
-    total_df.to_csv('{}/curvature_and_LL_{}-{}-{}_combined.csv'.format(OUTDIR, subject, domain, DIM))
+    total_df.to_csv('{}/curvature_and_LL_{}-{}-{}_combined_likelihoods.csv'.format(OUTDIR, subject, domain, DIM))
