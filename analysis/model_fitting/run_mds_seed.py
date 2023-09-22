@@ -203,7 +203,7 @@ def spherical_points_of_best_fit(judgments, number_repeats, args, start_points=N
         distances = spherical_distances(sph_points, 1/curvature)
         probs = find_probabilities(distances, pair_a, pair_b, parameters['noise_st_dev'], parameters['no_noise'])
         # calculate log-likelihood, is_bad flag
-        ll, is_bad = calculate_ll(counts, probs, number_repeats)
+        ll, is_bad = calculate_ll(counts, probs, repeats)
         LOG.debug('geometry is good: {}'.format(not is_bad))
         # fmin_costs.append(-1 * ll)  # debugging fmin
         return -1 * ll

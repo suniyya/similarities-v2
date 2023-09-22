@@ -19,7 +19,7 @@ import matplotlib.pyplot as plt
 # from analysis.model_fitting.rough_common_models import subjects
 
 MODELS_DIRECTORY = '/Users/suniyya/Dropbox/Research/Thesis_Work/Psychophysics_Aim1/geometric-modeling/euclidean'
-SUBJECTS = ['MC', 'SJ', 'SAW', 'YCL', 'AJ', 'SN', 'ZK']  # , 'BL', 'SA', 'EFV']
+SUBJECTS = ['MC', 'SJ', 'SAW', 'YCL', 'AJ', 'SN', 'ZK', 'BL', 'SA', 'EFV']
 SUBJECT_IDS = {'MC': 'S1', 'BL': 'S2', 'EFV': 'S3', 'SJ': 'S4', 'SAW': 'S5',
                'YCL': 'S7', 'SA': 'S8', 'NK': 'S6', 'JF': 'S9', 'AJ': 'S10', 'SN': 'S11', 'ZK': 'S12',
                'consensus': 'consensus'}
@@ -91,13 +91,14 @@ def proc_distances_by_subject():
                     points_j = np.load(domain_files[j])
                     m1, m2, difference = procrustes(points_i, points_j)
                     proc_dists_sub[i, j] = difference
+                    proc_dists_sub[j, i] = difference
 
             # sns.color_palette("vlag", as_cmap=True)
-            mask = np.zeros_like(proc_dists_sub)
-            mask[np.triu_indices_from(proc_dists_sub)] = True
+            # mask = np.zeros_like(proc_dists_sub)
+            # mask[np.triu_indices_from(proc_dists_sub)] = True
             with sns.axes_style("white"):
-                g = sns.heatmap(np.array(proc_dists_sub), mask=mask, square=True, vmax=1, ax=axes[d], cbar=is_cbar[d],
-                                cbar_kws={"shrink": 0.4}, cbar_ax=axes[-1], cmap='Purples')
+                g = sns.heatmap(np.array(proc_dists_sub), square=True, vmax=1, ax=axes[d], cbar=is_cbar[d],
+                                cbar_kws={"shrink": 0.4}, cbar_ax=axes[-1], cmap='viridis') #mask=mask)
                 g.set_title(subject + '- Dim: ' + str(dim), fontsize=10)
                 if d == 0:
                     g.set_yticklabels(DOMAIN_NAMES, rotation=360)
@@ -198,9 +199,9 @@ def proc_errors_transition_plot(subject, dim=2):
     plt.show()
 
 
-# proc_distances_by_subject()
+proc_distances_by_subject()
 # proc_distances_consensus()
-# proc_dist_by_domain(5, True)
+# proc_dist_by_domain(5)
 
 # if dim == 3:
 #     # 3D scatterplots

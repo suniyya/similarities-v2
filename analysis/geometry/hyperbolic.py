@@ -17,7 +17,7 @@ logging.basicConfig(level=logging.INFO)
 LOG = logging.getLogger(__name__)
 
 
-def sphere_map(X, radius):
+def sphere_map_deprecated(X, radius):
     """ Map points in Euclidean space to points on a spherical surface using stereographic projection
     adapted from https://en.wikipedia.org/wiki/Stereographic_projection to work for projection from a disk of
     @param radius: R to a sphere of radius R.
@@ -37,12 +37,38 @@ def sphere_map(X, radius):
     return Y
 
 
+def sphere_map(X, radius):
+    """ June 14, 2023
+    apply T(mu.x), where mu is 1/radius
+    Changed the sphere map to improve visualization
+    map first coordinate to (1-|z|^2)/(1+|z|^2)
+    all others to 2zk/(1+|z|^2)
+    @param radius: R to a sphere of radius R.
+    @param X: d by n matrix with n points of dimension d in Rd (real numbers, d dim)
+    @return Y: d+1 by n matrix with n points projected onto the sphere of dimension d, which is embedded in
+    d+1-dimensional space
+    """
+    X = X/radius
+    # retain coordinates of X but add a 0-th coordinate which is a function of the d-dimensional coordinate values
+    d, n = X.shape
+    Y = zeros((d + 1, n))
+    # squared norms of all vectors = dot products
+    dot_prods = einsum('ij,ij->j', X, X)  # https://stackoverflow.com/questions/6229519/numpy-column-wise-dot-product
+    for k in range(1, d+1):
+        for p in range(n):
+            Y[k, p] = 2 * X[k-1, p]/(1 + dot_prods[p])
+    for p in range(n):
+        Y[0, p] = (1 - dot_prods[p])/(1 + dot_prods[p])
+    return Y
+
+
 def loid_map(X, degree_curvature):
     """ Map points in Euclidean space to points on the hyperboloid using a mapping to the Loid space.
     @param degree_curvature: the aforementioned lambda parameter, 0 if distances are Euclidean.
     @param X: d by n matrix with n points of dimension d in Rd (real numbers, d dim)
     @return Y: d+1 by n matrix with n points projected onto the hyperboloid of dimension d, which is embedded in
     d+1-dimensional space
+    apply L(lambda.x)
     """
     # retain coordinates of X but add a 0-th coordinate which is a function of the d-dimensional coordinate values
     d, n = X.shape
@@ -85,7 +111,7 @@ def hyperbolic_distances(X, curvature):
     return arccosh(-round(inner_product, 6)) / curvature
 
 
-def spherical_distances(X, radius):
+def spherical_distances_deprecated(X, radius):
     """
     Computes the spherical distance between points ON the sphere.
     Assumes the points passed in are not off the surface - already projected!
@@ -96,6 +122,20 @@ def spherical_distances(X, radius):
     # standard inner product
     inner_product = X.T @ X  # do not make it negative
     interstimulus_distances = (radius/2) * arccos(round((inner_product / (radius**2)), 6))
+    return interstimulus_distances
+
+
+def spherical_distances(X, radius):
+    """ June 14 2023
+    Computes the spherical distance between points ON the sphere.
+    Assumes the points passed in are not off the surface - already projected!
+    @param radius: radius of the sphere
+    @param X: d-by-n matrix of coordinates for points on a sphere
+    @return: cos-1(-[X, X]) = an n-by-n matrix of pairwise distance matrix for all points X
+    """
+    # standard inner product
+    inner_product = X.T @ X  # do not make it negative
+    interstimulus_distances = (radius/2) * arccos(round(inner_product, 6))
     return interstimulus_distances
 
 
@@ -193,3 +233,14 @@ if __name__ == '__main__':
                                   sigma,
                                   CONFIG['num_stimuli'],
                                   ii))
+
+
+# fig = plt.figure()
+# ax = fig.add_subplot(projection='3d')
+# ax.axes.set_xlim3d(left=-2.2, right=2.2)
+# ax.axes.set_ylim3d(bottom=-2.2, top=2.2)
+# ax.axes.set_zlim3d(bottom=-0.6, top=3.1)
+# Y = sphere_map(all_pts, 1/deg_curv[2])
+# ax.scatter(all_pts[0, :], all_pts[1, :], [0]*231, color=[0.5, 0.5, 0.5])
+# ax.scatter(Y[1, :], Y[2, :], Y[0, :], color=[0.3, 0.7, 0.8], alpha=0.9, s=4)
+# plt.show()

@@ -13,9 +13,9 @@ epsilon: 1e-30
 minimization: 'gradient-descent'
 tolerance: 1e-6
 fatol: 1e-5
-max_iterations: 30000
-learning_rate: 0.05 # was 0.01
+max_iterations: 35000 #30000
+learning_rate: 0.05 # was 0.01/ 0.05
 # Non-Euclidean Parameters
-curvature: 0
+curvature: 1
 hyperbolic: False
 spherical: False

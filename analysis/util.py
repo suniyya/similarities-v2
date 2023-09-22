@@ -3,10 +3,13 @@ Some utilities to help with processing psychophysical data files
 """
 import yaml
 import json
+import pandas as pd
 from scipy.io import savemat
 import glob
 import numpy as np
 from itertools import combinations
+
+from scipy.spatial.distance import pdist
 
 
 def stimulus_names():
@@ -95,6 +98,39 @@ def judgments_to_arrays(judgments_dict, repeats):
     return first_pair, second_pair, comparison_counts, comparison_repeats
 
 
+def bias_dict(use_all=False):
+    path_to_bias_files = '/Users/suniyya/Dropbox/Research/Thesis_Work/Psychophysics_Aim1/simulations/euclidean/' \
+                         'bias-estimation/simulation_simple_ranking*.csv'
+    if use_all:
+        path_to_bias_files2 = '/Users/suniyya/Dropbox/Research/Thesis_Work/Psychophysics_Aim1/simulations/euclidean/' \
+                            'bias-estimation/*/simulation_simple_ranking*.csv'
+    else:
+        path_to_bias_files2 = ''
+    # access simulation results and from these read out bias from RMS dist: sigma.
+    sim_files = glob.glob(path_to_bias_files)
+    sim_files2 = glob.glob(path_to_bias_files2)
+    sim_files = sim_files + sim_files2
+    df = pd.concat([pd.read_csv(f) for f in sim_files])
+    return df
+
+
+def read_out_median_bias(bias_df, dim, rms_ratio, tolerance=0.5, samples=40):
+    # For a given value of RMS distance to sigma, read out the median bias between geometrically unconstrained
+    # "best" model LL and the ground truth LL
+    # for figure 5 variant, used tolerance of 0.5 for rms >= 0.5, tol =0.2 for rms <0.5 and samples =40
+    biases_df = bias_df[bias_df['True Model'] == str(dim) + 'D']
+    if rms_ratio < 0.5:
+        tol_val = 0.4
+    else:
+        tol_val = tolerance
+    df_temp = biases_df[biases_df['RMS:Sigma'].between(rms_ratio - tol_val, rms_ratio + tol_val)]
+    if len(df_temp) < samples:
+        print('WARNING: FEW SAMPLES TO ESTIMATE BIAS FOR RATIO ', np.round(rms_ratio, 2), dim)
+        raise ValueError
+    # print('Num samples ', len(df_temp), 'rms_ratio: ', rms_ratio)
+    median_bias = np.quantile(df_temp['Best LL - Ground Truth LL'].sample(n=samples, random_state=942), 0.5)
+    return median_bias
+
 # def reformat_key(comparison_trial_key):
 #     names_to_ids = stimulus_name_to_id()
 #     stim_pair1, stim_pair2 = comparison_trial_key.split('<')
@@ -163,8 +199,10 @@ def read_in_params():
             stimulus_id_to_name())
 
 
-def combine_model_npy_files_to_mat(directory, subject, outdir='.', min_dim=1, max_dim=7):
+def combine_model_npy_files_to_mat(directory, domain, subject, outdir='.', min_dim=1, max_dim=7):
     """
+    Edited on Aug 3, 2023
+    Add LL and biases too
     @param directory: input dir - dir in which is a domain dir then a subject dir
     @param subject:
     @param outdir:
@@ -172,19 +210,56 @@ def combine_model_npy_files_to_mat(directory, subject, outdir='.', min_dim=1, ma
     @param max_dim:
     @return:
     """
-    domains = ['texture', 'intermediate_texture', 'intermediate_object', 'image', 'word',
-               'texture_grayscale', 'texture_color']
+    # domains = ['bgca3pt9', 'bdce3pt9', 'bc6pt9', 'tvpm3pt9', 'bcpm3pt9', 'faces_mpi_en2_fc', 'bcpp5qpt9',
+    #            'bc55qpt9', 'bcpm24pt9', 'bcmm55qpt9', 'bcmp55qpt9', 'bcpm55qpt9']
+    # domains = ['texture', 'intermediate_texture', 'intermediate_object', 'image', 'word']
     data = {'stim_labels': stimulus_names()}
-    for domain in domains:
-        data[domain] = {}
-        for d in range(min_dim, max_dim + 1):
-            model_files = glob.glob("{}/{}/{}/{}_{}_anchored_points_sigma_*_dim_{}.npy".format(
-                directory, domain, subject, subject, domain, d
-            ))
-            if len(model_files) > 0:
-                model_file = model_files[0]
-                data[domain]["dim{}".format(d)] = np.array(np.load(model_file))
-    savemat("{}/{}.mat".format(outdir, subject), data)
+    bias_df = bias_dict()  # for LL bias estimation
+    rms_dists_by_dim = {}
+    for d in range(min_dim, max_dim + 1):
+        model_files = glob.glob("{}/{}/{}/{}_{}_anchored_points_sigma_*_dim_{}.npy".format(
+            directory, domain, subject, subject, domain, d
+        ))
+        # enter coordinates for each model dimension
+        if len(model_files) > 0:
+            model_file = model_files[0]
+            points = np.array(np.load(model_file))
+            data["dim{}".format(d)] = points
+            distances = pdist(points)
+            rms_dists_by_dim[d] = np.sqrt(np.mean([d ** 2 for d in distances]))
+    # open LL file
+    ll_file = glob.glob("{}/{}/{}*{}*likelihoods*.csv".format(directory, domain, subject, domain))
+    if len(ll_file) == 0:
+        pass  # what does pass do?
+    lls = pd.read_csv(ll_file[0])
+
+    data['rawLLs'] = []  # enter raw log-likelihoods
+    data['debiasedRelativeLL'] = []
+    data['biasEstimate'] = []
+    best_index = lls.index[lls['Model'] == 'best']
+    best_LL = lls.iloc[best_index]['Log Likelihood'].values[0]
+    data['bestModelLL'] = best_LL
+    data['metadata'] = ("README\n\nrawLLs[i] is the raw model LL for model with i dimensions\n"
+                        "biasEstimate[i] is the median bias estimated for the i-dimensional model, \n"
+                        "  based on the RMS distance: sigma\n\n"
+                        "debiasedRelativeLL = (rawLLs + biasEstimate) - bestModelLL\n"
+                        "--------------------------------------------------------------------------")
+    temp = {'bias': {}, 'debiasedLL': {}, 'rawLL': {}}
+    for idx, row in lls.iterrows():
+        model = 'dim' + str(row['Model'][:-1]) if row['Model'][-1] == 'D' else row['Model']
+        if model[0:3] == 'dim':
+            # get bias for each model LL
+            dim = int(model[3:])
+            temp['rawLL'][dim] = row['Log Likelihood']
+            bias = read_out_median_bias(
+                bias_df, dim, rms_dists_by_dim[dim], tolerance=0.5, samples=70)
+            temp['bias'][dim] = bias
+            # record debiased model LLs
+            temp['debiasedLL'][dim] = row['Log Likelihood'] - (best_LL - bias)
+    data['biasEstimate'] = [temp['bias'][key] for key in range(min_dim, max_dim+1)]
+    data['rawLLs'] = [temp['rawLL'][key] for key in range(min_dim, max_dim+1)]
+    data['debiasedRelativeLL'] = [temp['debiasedLL'][key] for key in range(min_dim, max_dim+1)]
+    savemat("{}/{}_coords_{}.mat".format(outdir, domain, subject), data)
 
 
 def json_to_pairwise_choice_probs(filepath):
@@ -263,3 +338,16 @@ def write_choice_probs_to_mat(filepath, outdir, outfilename, include_names=False
         data['s1_name'] = s1_name
         data['s2_name'] = s2_name
     savemat("{}/{}.mat".format(outdir, outfilename), data)
+
+
+if __name__ == '__main__':
+    subjects = ['JF'] #'MC', 'SJ', 'SAW', 'YCL', 'AJ', 'SN', 'ZK', 'BL', 'EFV', 'SA', 'NK', 'CME']   # 'JF' , 'CME',
+    for subject in subjects:
+        combine_model_npy_files_to_mat(
+            '/Users/suniyya/Dropbox/Research/Thesis_Work/Psychophysics_Aim1/geometric-modeling/euclidean',
+            'texture',
+            subject, outdir='.', min_dim=1, max_dim=7)
+        # write_choice_probs_to_mat(
+        #     '/Users/suniyya/Dropbox/Research/Thesis_Work/Psychophysics_Aim1/experiments/experiments'
+        #     '/{}_exp/subject-data/preprocessed/{}_{}_exp.json'.format(domain, subject, domain),
+        #     '/Users/suniyya/Desktop', '{}_{}_choices'.format(subject, domain), include_names=False)

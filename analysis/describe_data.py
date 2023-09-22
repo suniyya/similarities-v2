@@ -5,13 +5,14 @@ Take in files in json format and look through it
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from analysis.util import all_distance_pairs, read_json_file, ranking_to_pairwise_comparisons
+from analysis.util import all_distance_pairs, read_json_file, ranking_to_pairwise_comparisons, \
+    json_to_pairwise_choice_probs
 from matplotlib import pyplot as plt
 from itertools import combinations
 
 
 def read_all_files(subjects, data_dir):
-    # Keys are "subject,experiment", e.g. "MC,word"
+    # Keys are "subject,experiment", e.g. "MC"
     rank_judgments_by_subject = {}
     for subject in subjects:
         rank_judgments_by_subject[subject] = read_json_file(subject, data_dir)
@@ -35,35 +36,32 @@ def group_by_overlap(reference, trials):
     result = []
     for i in range(6):  # could change if it was a different paradigm, > 37 stimuli
         for j in range(i + 1, 6):
-            stimuli = sorted(list(circles[i].intersection(circles[j])))
-            if len(stimuli) == 2:
-                result.append({'1': '{}:{}'.format(reference, '.'.join(sorted(list(circles[i])))),
-                               '2': '{}:{}'.format(reference, '.'.join(sorted(list(circles[j])))),
-                               'stimuli': stimuli})
+            if j < len(circles):
+                stimuli = sorted(list(circles[i].intersection(circles[j])))
+                if len(stimuli) == 2:
+                    result.append({'1': '{}:{}'.format(reference, '.'.join(sorted(list(circles[i])))),
+                                   '2': '{}:{}'.format(reference, '.'.join(sorted(list(circles[j])))),
+                                   'stimuli': stimuli})
     return result
 
 
-def choice_probability_distribution_plot(subject_names, data):
-    df = {'choice probability': [], 'frequency': [], 'subject': []}
-    for i in range(len(subject_names)):
-        contents = data[subject_names[i]]  # read in data file contents
-        counts = np.array([])
-        for trial in contents:
-            pairwise_decisions = list(ranking_to_pairwise_comparisons(all_distance_pairs(trial),
-                                                                      contents[trial]).values())
-            counts = np.concatenate((counts, np.array(pairwise_decisions)))
-        probs = counts / 5.0
-        unique, freq = np.unique(probs, return_counts=True)
-        freq = freq / float(sum(freq))
-        df['choice probability'] += list(unique)
-        df['frequency'] += list(freq)
-        df['subject'] += [subject_names[i] for _ in range(len(unique))]
+def choice_probability_distribution_plot(filepath, sub, exp, ax=None):
+    df = {'choice probability': [], 'frequency': []}
+    comparisons, repeats = json_to_pairwise_choice_probs(filepath)
+    counts = np.array(list(comparisons.values()))
+    repeats = np.array(list(repeats.values()))
+    probs = np.divide(counts, repeats)
+    unique, freq = np.unique(probs, return_counts=True)
+    freq = freq / float(sum(freq))
+    df['choice probability'] += list(unique)
+    df['frequency'] += list(freq)
     df = pd.DataFrame(df)
     sns.catplot(x="choice probability", y="frequency",
-                kind="bar", hue="subject",
-                data=df, legend_out=False)
+                kind="bar", palette=['b', 'b', 'b', 'b', 'b', 'b'],
+                data=df, legend_out=False, ax=ax)
     plt.yticks([0, 0.1, 0.2, 0.3, 0.4])
-    plt.show()
+    plt.title('{}: {}'.format(sub, exp))
+    # plt.show()
 
 
 def choice_prob_ratio_heatmap(trialwise_choice_probabilities, subject_names):
@@ -117,7 +115,7 @@ def choice_prob_ratio_heatmap(trialwise_choice_probabilities, subject_names):
 def context_effects_heatmap(subs, data, annotate=True):
     # need to make an empty heatmap at the end because the colorbar shrinks the heatmap next to it
     # and I don't know how else to fix that
-    f, ax = plt.subplots(1, len(subs)+1)  # 1 because of empty heatmap with colorbar
+    f, ax = plt.subplots(1, len(subs) + 1)  # 1 because of empty heatmap with colorbar
     f.tight_layout(pad=1)
     # cbar_kws = None
     keep_colorbar = False
@@ -146,11 +144,11 @@ def context_effects_heatmap(subs, data, annotate=True):
                 judgment1 = ranking_to_pairwise_comparisons(
                     dist_pair,
                     subject_trials[animal][overlapping_pair['1']]
-                )[binary_decision]
+                )[0][binary_decision]
                 judgment2 = ranking_to_pairwise_comparisons(
                     dist_pair,
                     subject_trials[animal][overlapping_pair['2']]
-                )[binary_decision]
+                )[0][binary_decision]
 
                 prob_in_context_ab[judgment1, judgment2] += 1
         prob_in_context_ab = prob_in_context_ab / float(context_trials_count)
@@ -165,8 +163,8 @@ def context_effects_heatmap(subs, data, annotate=True):
 
         sns.heatmap(ratio_map, square=True,
                     xticklabels=[0, None, None, None, None, 1], annot=annotate,
-                    yticklabels=[0, None, None, None, None, 1], cmap="bwr", center=1,
-                    ax=ax[i], cbar=keep_colorbar, vmin=0, vmax=6)
+                    yticklabels=[0, None, None, None, None, 1],center=1,cmap='seismic', #"coolwarm", center=1,
+                    ax=ax[i], cbar=keep_colorbar, vmin=0, vmax=8)
         bottom, top = ax[i].get_ylim()
         ax[i].set_title(SUBJECTIDS[subs[i]])
         ax[i].set_ylim(bottom + 0.5, top - 0.5)
@@ -176,8 +174,8 @@ def context_effects_heatmap(subs, data, annotate=True):
     i += 1  # make 1 extra empty heatmap with a color bar. SO that the actual heatmaps are not made smaller by colorbar.
     sns.heatmap(np.zeros((6, 6)), square=True,
                 xticklabels=[0, None, None, None, None, 1], annot=annotate,
-                yticklabels=[0, None, None, None, None, 1], cmap="bwr", center=1,
-                ax=ax[i], cbar=True, cbar_kws={"shrink": 0.5}, vmin=0, vmax=6)
+                yticklabels=[0, None, None, None, None, 1], center=1,cmap='seismic', #"coolwarm", center=1,
+                ax=ax[i], cbar=True, cbar_kws={"shrink": 0.5}, vmin=0, vmax=8, annot_kws={"fontsize": 8})
     cbar = ax[i].collections[0].colorbar
     cbar.ax.tick_params(labelsize=9)
     f.tight_layout()
@@ -188,13 +186,16 @@ def context_effects_heatmap(subs, data, annotate=True):
 
 def get_choice_probs_by_subject(subject_names, data):
     choice_probs = {}
+    num_repeats = {}
     for subject_name in subject_names:
         choice_probs[subject_name] = {}
+        num_repeats[subject_name] = {}
         ranking_trials = data[subject_name]
         for trial in ranking_trials:
-            choice_probs[subject_name][trial] = ranking_to_pairwise_comparisons(all_distance_pairs(trial),
-                                                                                ranking_trials[trial])
-    return choice_probs
+            choice_probs[subject_name][trial], num_repeats[subject_name][trial] = ranking_to_pairwise_comparisons(
+                all_distance_pairs(trial),
+                ranking_trials[trial])
+    return choice_probs, num_repeats
 
 
 def arrange_choice_probs_by_comparison(subject_names, choice_probs):
@@ -228,11 +229,23 @@ if __name__ == '__main__':
                   "SA": "S8", "JF": "S9", "AJ": "S10", "SN": "S11", "ZK": "S12", "CME": "S13"}
     ALL_DATA = read_all_files(SUBJECTS, DATA_DIR)
     # Display choice probability distributions
-    choice_probability_distribution_plot(SUBJECTS, ALL_DATA)
+    # num_subs = len(SUBJECTS)
+    # f, axs = plt.subplots(1, num_subs, sharex='all', sharey='col')
+    # for i in range(num_subs):
+    #     filepath = DATA_DIR + '/{}_{}_exp.json'.format(SUBJECTS[i], EXP)
+    #     choice_probability_distribution_plot(filepath, SUBJECTS[i], EXP, axs[i])
+    #     axs[i].set_title(SUBJECTS[i])
+    #     axs[i].set_ylim([0, 0.3])
+    #     axs[i].set_xticklabels([0] + [None]*4 + [0.5] + [None]*4 + [1])
+    #     if i > 0:
+    #         axs[i].set_ylabel(None)
+    #         axs[i].set_yticklabels([])
+    # plt.show()
 
     # Create subject-comparison heatmaps
-    subject_comparison_heatmap(SUBJECTS, ALL_DATA)
+    # subject_comparison_heatmap(SUBJECTS, ALL_DATA)
 
     # Create context effects heatmaps
-    #context_effects_heatmap(SUBJECTS, ALL_DATA, annotate=False)
-    context_effects_heatmap(['MC'], ALL_DATA, annotate=False)
+    context_effects_heatmap(SUBJECTS, ALL_DATA, annotate=True)
+    context_effects_heatmap(SUBJECTS, ALL_DATA, annotate=False)
+    # context_effects_heatmap(['MC'], ALL_DATA, annotate=False)

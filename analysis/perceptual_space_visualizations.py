@@ -1,3 +1,4 @@
+import glob
 import numpy as np
 import seaborn as sns
 from scipy.io import loadmat
@@ -11,6 +12,27 @@ import matplotlib.ticker as ticker
 from matplotlib.offsetbox import OffsetImage, AnnotationBbox
 from matplotlib.cbook import get_sample_data
 from matplotlib.colors import ListedColormap, LinearSegmentedColormap
+
+
+def calculate_var_explained(subjects, domains, max_dim=7, by_dim=5):
+    result = np.zeros((len(subjects), len(domains)))
+    result[:] = np.nan
+    file_string = '/Users/suniyya/Dropbox/Research/Thesis_Work/Psychophysics_Aim1/geometric-modeling/euclidean/' \
+                  '{}/{}/{}_{}_anchored_points_sigma_*_dim_{}.npy'
+    for i in range(len(subjects)):
+        for j in range(len(domains)):
+            npy_7d_file = file_string.format(domains[j], subjects[i], subjects[i], domains[j], max_dim)
+            # if is file
+            files = glob.glob(npy_7d_file)
+            if len(files) == 1:
+                print('file found')
+                points = np.load(files[0])
+                pca = PCA(n_components=max_dim)
+                # obtain the 5 PC directions and project data onto that space
+                temp = pca.fit_transform(points)
+                sum_var_exp = sum(pca.explained_variance_ratio_[0:by_dim])
+                result[i, j] = sum_var_exp
+    return result
 
 
 def do_pca(points, num_pcs=5):
@@ -124,9 +146,10 @@ def scatterplots_2d_image_annotated(subject_name, subject_exp_data, image_source
             plt.annotate(stimuli[label_idx],  # this is the text
                          (x, y),  # this is the point to label
                          textcoords="offset points",  # how to position the text
-                         xytext=(np.random.normal(0.5, 3), np.random.normal(-0.5, 3)), # distance from text to points (x,y)
-                         size=10,
-                         alpha=0.55,
+                         xytext=(np.random.normal(0.5, 3), np.random.normal(-0.5, 3)),
+                         # distance from text to points (x,y)
+                         size=8,
+                         # alpha=1, # 0.55
                          ha='center')  # horizontal alignment can be left, right or center
             label_idx += 1
         else:
@@ -172,4 +195,6 @@ if __name__ == '__main__':
     else:
         data = np.load(PATH_TO_NPY_FILE)
     data = do_pca(data)
+
+    # x = do_pca(data, 7)
     scatterplots_2d_image_annotated(NAME, data, image_source[EXP], SIGMA)

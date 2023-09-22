@@ -182,6 +182,7 @@ def simulate_judgments(trial_pairs, all_distances, sigmas, num_repeats=5, no_noi
 
     """
     counts = {}  # initialize counts for data to be returned
+    repeats = {}
     # the counts dictionary will hold judgements
     # key: "d_i,j > d_k,l" or "i,j>k,l"
     # value: number of times ij was judged to be greater than kl (int)
@@ -204,11 +205,13 @@ def simulate_judgments(trial_pairs, all_distances, sigmas, num_repeats=5, no_noi
                                          num_repeats,
                                          no_noise
                                          )[0]
-    return counts
+        repeats[key] = num_repeats
+    return counts, repeats
 
 
 def simulate_judgments_1d(trial_pairs, vectors, sigmas, num_repeats=5, no_noise=False, verbose=False):
     counts = {}  # initialize counts for data to be returned
+    repeats = {}
     # the counts dictionary will hold judgements
     # key: "d_i,j > d_k,l" or "i,j>k,l"
     # value: number of times ij was judged to be greater than kl (int)
@@ -229,6 +232,7 @@ def simulate_judgments_1d(trial_pairs, vectors, sigmas, num_repeats=5, no_noise=
                                         num_repeats,
                                         no_noise
                                         )[0]
+        repeats[key] = num_repeats
     return counts
 
 
@@ -256,15 +260,15 @@ def run_experiment(stimuli, distances, args, trials=None):
     n_dim = len(stimuli[0])
     if n_dim == 1:
         # distances are calculated here
-        judgments = simulate_judgments_1d(trials, stimuli, args['sigmas'],
-                                          num_repeats=args['num_repeats'],
-                                          no_noise=args['no_noise'],
-                                          verbose=args['verbose'])
+        judgments, repeats = simulate_judgments_1d(trials, stimuli, args['sigmas'],
+                                                   num_repeats=args['num_repeats'],
+                                                   no_noise=args['no_noise'],
+                                                   verbose=args['verbose'])
     else:
-        judgments = simulate_judgments(trials, distances, args['sigmas'],
-                                       num_repeats=args['num_repeats'],
-                                       no_noise=args['no_noise'],
-                                       verbose=args['verbose'])
+        judgments, repeats = simulate_judgments(trials, distances, args['sigmas'],
+                                                num_repeats=args['num_repeats'],
+                                                no_noise=args['no_noise'],
+                                                verbose=args['verbose'])
     LOG.info('##  Trials created: %s', len(trials))
     LOG.info('##  Experimental judgments obtained')
-    return judgments, np.array(stimuli)
+    return judgments, repeats, np.array(stimuli)

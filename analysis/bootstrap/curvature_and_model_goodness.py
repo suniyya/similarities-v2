@@ -5,6 +5,7 @@ sigma values.
 
 This should yield a scatterplot of model LLs by curvature values. We start by doing so for the 2D case and we can
 progress to higher dimensions as needed.
+######## DEPRECATED - DO NOT USE ###########
 
 The inputs are
 - a range of curvature values
@@ -34,126 +35,125 @@ CONFIG['hyperbolic'] = None
 
 
 def run(args):
-    num_it, judgments, CONFIG, subject, domain, dim, OUTDIR = args
-    print(num_it)
-    degree_curvature = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]
-    degree_curvature_h = [-0.1, -0.2, -0.3, -0.4, -0.5, -0.6, -0.7, -0.8, -0.9, -1]
+    judgments, repeats, CONFIG, subject, domain, dim, OUTDIR = args
+    # sigma_val = CONFIG['sigmas']
+    # CONFIG['sigmas'] = {'compare': sigma_val, 'dist': 0}
+    degree_curvature = [0.05, 0.15, 0.25]
+    degree_curvature_h = []  # -0.1, -0.2, -0.3, -0.4, -0.5, -0.6, -0.7, -0.8, -0.9, -1]
 
-    def sample_judgments(original_judgments, num_repeats):
-        """
-        Simulate judgments based on empirical choice probabilities
-        :param original_judgments:
-        :param num_repeats:
-        :return:
-        """
-        sample = {}
-        for trial, count in original_judgments.items():
-            sample[trial] = 0
-            prob = float(count) / num_repeats
-            for j in range(num_repeats):
-                random_draw = np.random.uniform(0, 1)
-                if random_draw < prob:
-                    sample[trial] += 1
-        return sample
+    # def sample_judgments(original_judgments, num_repeats):
+    #     """
+    #     Simulate judgments based on empirical choice probabilities
+    #     :param original_judgments:
+    #     :param num_repeats:
+    #     :return:
+    #     """
+    #     sample = {}
+    #     for trial, count in original_judgments.items():
+    #         sample[trial] = 0
+    #         prob = float(count) / num_repeats
+    #         for j in range(num_repeats):
+    #             random_draw = np.random.uniform(0, 1)
+    #             if random_draw < prob:
+    #                 sample[trial] += 1
+    #     return sample
 
-    def fit_model(similarity_judgments, curvature, params, dim, start_points):
+    def fit_model(similarity_judgments, num_repeats_dict, curvature, params, dim, start_points):
         params_copy = copy.deepcopy(params)
         num_judgments = len(similarity_judgments)
+        total_num_triads = sum([num_repeats_dict[k] for k in similarity_judgments.keys()])
         noise = np.sqrt(params['sigmas']['compare'] ** 2 + params['sigmas']['dist'] ** 2)
         params_copy['n_dim'] = dim  # ensure correct model is tested
         if curvature == 0:
             # fit Euclidean model
-            x, ll, fmin_costs = rs.points_of_best_fit(similarity_judgments, params_copy, start_points)
-            ll = -1 * ll / (params['num_repeats'] * num_judgments)
+            x, ll = rs.points_of_best_fit(similarity_judgments, repeats, params_copy, start_points)
+            ll = -1 * ll / total_num_triads
         elif curvature > 0:
             # fit spherical model
             curvature_val = curvature
             params_copy['curvature'] = curvature_val
-            x, ll, fmin_costs = rs.spherical_points_of_best_fit(similarity_judgments, params_copy, start_points)
-            ll = -1 * ll / (params['num_repeats'] * num_judgments)
+            x, ll = rs.spherical_points_of_best_fit(similarity_judgments, repeats, params_copy, start_points)
+            ll = -1 * ll / total_num_triads
         else:
             # fit hyperbolic model
             curvature_val = -1 * curvature
             params_copy['curvature'] = curvature_val
-            x, ll, fmin_costs = rs.hyperbolic_points_of_best_fit(similarity_judgments, params_copy, start_points)
-            ll = -1 * ll / (params['num_repeats'] * num_judgments)
+            x, ll = rs.hyperbolic_points_of_best_fit(similarity_judgments, repeats, params_copy, start_points)
+            ll = -1 * ll / total_num_triads
         return ll, curvature, noise, x
 
-    def produce_surrogate_data(judgments_orig, params, batch_size=1):
-        """
-        Return a collection of surrogate judgments based on real data
-        @param judgments_orig:  real data
-        @param batch_size: size of surrogate datasets to make in a go
-        @param params: read in from Config file
-        @return:
-        """
-        batch = []
-        for _ in range(batch_size):
-            new_judgments = sample_judgments(judgments_orig, params['num_repeats'])
-            batch.append(new_judgments)
-        return batch
+    # def produce_surrogate_data(judgments_orig, params, batch_size=1):
+    #     """
+    #     Return a collection of surrogate judgments based on real data
+    #     @param judgments_orig:  real data
+    #     @param batch_size: size of surrogate datasets to make in a go
+    #     @param params: read in from Config file
+    #     @return:
+    #     """
+    #     batch = []
+    #     for _ in range(batch_size):
+    #         new_judgments = sample_judgments(judgments_orig, params['num_repeats'])
+    #         batch.append(new_judgments)
+    #     return batch
 
-    surrogate_datasets = produce_surrogate_data(judgments, CONFIG, 1)
+    # surrogate_datasets = produce_surrogate_data(judgments, CONFIG, 1)
     results = {'LL': [], 'Lambda-Mu': [], 'Curvature of Space': [], 'Sigma': [], 'Dimension': [], 'Subject': [],
                'Domain': []}
-    for data in surrogate_datasets:
-        start_euclidean = None
-        for _c in range(len(degree_curvature)):
-            c = degree_curvature[_c]
-            if _c == 0:
-                start = None
-            log_likelihood, curvature_val, sigma, coords = fit_model(data, c, CONFIG, dim, start)
-            if c == 0:
-                start_euclidean = coords
-            LOG.info("LL: {}".format(log_likelihood))
-            LOG.info("Sph fit points: ")
-            print(coords)
-            outfilename = '{}/{}_{}_spherical_model_coords_sigma_{}_dim_{}_mu_{}_{}'.format(
-                OUTDIR,
-                subject, domain,
-                str(CONFIG['sigmas']['compare'] + CONFIG['sigmas']['dist']),
-                dim,
-                curvature_val,
-                num_it
-            )
-            np.save(outfilename, coords)
-            start = coords
-            # write to pandas file
-            results['Lambda-Mu'].append(curvature_val)
-            results['Curvature of Space'].append(curvature_val ** 2)
-            results['LL'].append(log_likelihood)
-            results['Sigma'].append(sigma)
-            results['Dimension'].append(dim)
-            results['Subject'].append(subject)
-            results['Domain'].append(domain)
-            pprint.pprint(results)
-        for _c in range(len(degree_curvature_h)):
-            c = degree_curvature_h[_c]
-            if _c == 0:
-                start = start_euclidean
-            log_likelihood, curvature_val, sigma, coords = fit_model(data, c, CONFIG, dim, start)
-            LOG.info("LL: {}".format(log_likelihood))
-            LOG.info("Hyp fit points: ")
-            print(coords)
-            outfilename = '{}/{}_{}_hyperbolic_model_coords_sigma_{}_dim_{}_lambda_{}_{}'.format(
-                OUTDIR,
-                subject, domain,
-                str(CONFIG['sigmas']['compare'] + CONFIG['sigmas']['dist']),
-                dim,
-                curvature_val,
-                num_it
-            )
-            np.save(outfilename, coords)
-            start = coords
-            # write to pandas file
-            results['Lambda-Mu'].append(curvature_val)
-            results['Curvature of Space'].append(curvature_val ** 2)
-            results['LL'].append(log_likelihood)
-            results['Sigma'].append(sigma)
-            results['Dimension'].append(dim)
-            results['Subject'].append(subject)
-            results['Domain'].append(domain)
-            pprint.pprint(results)
+    start_euclidean = None
+    for _c in range(len(degree_curvature)):
+        c = degree_curvature[_c]
+        if _c == 0:
+            start = None
+        log_likelihood, curvature_val, sigma, coords = fit_model(judgments, repeats, c, CONFIG, dim, start)
+        if c == 0:
+            start_euclidean = coords
+        LOG.info("LL: {}".format(log_likelihood))
+        LOG.info("Sph fit points: ")
+        print(coords)
+        outfilename = '{}/{}_{}_spherical_model_coords_sigma_{}_dim_{}_mu_{}'.format(
+            OUTDIR,
+            subject, domain,
+            str(CONFIG['sigmas']['compare'] + CONFIG['sigmas']['dist']),
+            dim,
+            curvature_val
+        )
+        np.save(outfilename, coords)
+        start = coords
+        # write to pandas file
+        results['Lambda-Mu'].append(curvature_val)
+        results['Curvature of Space'].append(curvature_val ** 2)
+        results['LL'].append(log_likelihood)
+        results['Sigma'].append(sigma)
+        results['Dimension'].append(dim)
+        results['Subject'].append(subject)
+        results['Domain'].append(domain)
+        pprint.pprint(results)
+    for _c in range(len(degree_curvature_h)):
+        c = degree_curvature_h[_c]
+        if _c == 0:
+            start = start_euclidean
+        log_likelihood, curvature_val, sigma, coords = fit_model(judgments, repeats, c, CONFIG, dim, start)
+        LOG.info("LL: {}".format(log_likelihood))
+        LOG.info("Hyp fit points: ")
+        print(coords)
+        outfilename = '{}/{}_{}_hyperbolic_model_coords_sigma_{}_dim_{}_lambda_{}'.format(
+            OUTDIR,
+            subject, domain,
+            str(CONFIG['sigmas']['compare'] + CONFIG['sigmas']['dist']),
+            dim,
+            curvature_val
+        )
+        np.save(outfilename, coords)
+        start = coords
+        # write to pandas file
+        results['Lambda-Mu'].append(curvature_val)
+        results['Curvature of Space'].append(curvature_val ** 2)
+        results['LL'].append(log_likelihood)
+        results['Sigma'].append(sigma)
+        results['Dimension'].append(dim)
+        results['Subject'].append(subject)
+        results['Domain'].append(domain)
+        pprint.pprint(results)
     # # write df
     df = pd.DataFrame(results)
     return df
@@ -174,7 +174,6 @@ if proceed != 'y':
 
 DIM = int(input('Number of Dimensions: '))
 OUTDIR = input('Output directory for LLs and coordinates: ')
-NUM_SURROGATES = int(input('Number of surrogate data sets to make and fit: '))
 
 
 for subject in SUBJECTS:
@@ -184,10 +183,9 @@ for subject in SUBJECTS:
     judgments, repeats = json_to_pairwise_choice_probs(INPUT_DATA)
 
     dfs = []
-    for i in range(NUM_SURROGATES):
-        ARGS = (i, judgments, CONFIG, subject, domain, DIM, OUTDIR)
-        result = run(ARGS)
-        dfs.append(result)
+    ARGS = (judgments, repeats, CONFIG, subject, domain, DIM, OUTDIR)
+    result = run(ARGS)
+    dfs.append(result)
 
     total_df = pd.concat(dfs)
     print(total_df)

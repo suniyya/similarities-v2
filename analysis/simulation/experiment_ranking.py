@@ -112,6 +112,7 @@ def all_distance_pairs(trial_config):
 def ranking_to_pairwise_comparisons(distance_pairs, ranked_stimuli):
     # ranked_stimuli is a list of lists. each list is a 'repeat'
     comparisons = {}
+    repeats = {}
     for rank in ranked_stimuli:
         for pair in distance_pairs:
             # place the smaller number first for readability
@@ -129,11 +130,13 @@ def ranking_to_pairwise_comparisons(distance_pairs, ranked_stimuli):
             # 'Is dist A > dist B?' For this reason, I change the < sign to >.
             ordered = (pair[0][0], int(stim1[1:])), '>', (pair[2][0], int(stim2[1:]))
             if ordered not in comparisons:
+                repeats[ordered] = 1
                 comparisons[ordered] = 1 if rank[stim1] > rank[stim2] else 0
             else:
+                repeats[ordered] += 1
                 if rank[stim1] > rank[stim2]:
                     comparisons[ordered] += 1
-    return comparisons
+    return comparisons, repeats
 
 
 # helper

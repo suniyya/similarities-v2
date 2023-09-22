@@ -1,14 +1,21 @@
 import pandas as pd
 
 from analysis.model_fitting.pairwise_likelihood_analysis import log_likelihood_of_choice_probs
+from analysis.util import read_out_median_bias, bias_dict
 
 DATA_DIR = '/Users/suniyya/Dropbox/Research/Thesis_Work/Psychophysics_Aim1/geometric-modeling/euclidean'
 
 
-def write_new_lls(subject, domain, sigma, num_pts=37):
+def write_model_lls(subject, domain, sigma, num_pts=37, with_bias=False):
     lls = {'Model': [], 'Log Likelihood': [], 'number of points': [], 'Experiment': [], 'Subject': []}
     choice_prob_json = JSON_PATH.format(domain, subject, domain)
     current_ll = None
+    bias_df = None
+    rms_ratio = None
+    if with_bias:
+        lls['Bias'] = []
+        rms_ratio = rms()
+        bias_df = bias_dict()
     for dim in range(1, 8):
         path_pts = '{}/{}/{}/{}_{}_anchored_points_sigma_{}_dim_{}.npy'.format(
             DATA_DIR, domain, subject, subject, domain, sigma, dim)
@@ -18,6 +25,9 @@ def write_new_lls(subject, domain, sigma, num_pts=37):
         lls['number of points'].append(num_pts)
         lls['Experiment'].append(domain)
         lls['Subject'].append(subject)
+        if with_bias:
+            bias = read_out_median_bias(bias_df, dim, rms_ratio, tolerance=0.5, samples=100)
+            lls['Bias'].append(bias)
     lls['Model'].append('random')
     lls['Log Likelihood'].append(current_ll[1])
     lls['number of points'].append(num_pts)
