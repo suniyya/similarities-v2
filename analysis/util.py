@@ -99,11 +99,9 @@ def judgments_to_arrays(judgments_dict, repeats):
 
 
 def bias_dict(use_all=False):
-    path_to_bias_files = '/Users/suniyya/Dropbox/Research/Thesis_Work/Psychophysics_Aim1/simulations/euclidean/' \
-                         'bias-estimation/simulation_simple_ranking*.csv'
+    path_to_bias_files = './analysis/bias-estimation/simulation_simple_ranking*.csv'
     if use_all:
-        path_to_bias_files2 = '/Users/suniyya/Dropbox/Research/Thesis_Work/Psychophysics_Aim1/simulations/euclidean/' \
-                            'bias-estimation/*/simulation_simple_ranking*.csv'
+        path_to_bias_files2 = '/analysis/bias-estimation/*/simulation_simple_ranking*.csv'
     else:
         path_to_bias_files2 = ''
     # access simulation results and from these read out bias from RMS dist: sigma.
