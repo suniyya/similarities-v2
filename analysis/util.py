@@ -101,7 +101,7 @@ def judgments_to_arrays(judgments_dict, repeats):
 def bias_dict(use_all=False):
     path_to_bias_files = './analysis/bias-estimation/simulation_simple_ranking*.csv'
     if use_all:
-        path_to_bias_files2 = '/analysis/bias-estimation/*/simulation_simple_ranking*.csv'
+        path_to_bias_files2 = './analysis/bias-estimation/*/simulation_simple_ranking*.csv'
     else:
         path_to_bias_files2 = ''
     # access simulation results and from these read out bias from RMS dist: sigma.
@@ -128,29 +128,6 @@ def read_out_median_bias(bias_df, dim, rms_ratio, tolerance=0.5, samples=40):
     # print('Num samples ', len(df_temp), 'rms_ratio: ', rms_ratio)
     median_bias = np.quantile(df_temp['Best LL - Ground Truth LL'].sample(n=samples, random_state=942), 0.5)
     return median_bias
-
-# def reformat_key(comparison_trial_key):
-#     names_to_ids = stimulus_name_to_id()
-#     stim_pair1, stim_pair2 = comparison_trial_key.split('<')
-#     stim1, stim2 = stim_pair1.split(',')
-#     stim3, stim4 = stim_pair2.split(',')
-#     return (names_to_ids[stim3], names_to_ids[stim4]), '>', (names_to_ids[stim1], names_to_ids[stim2])
-
-
-# Should remove from use  - averages context trial probs - should not...
-# def json_to_choice_probabilities(json_contents, to_index=False):
-#     choice_probabilities = {}
-#     for trial, rankings in json_contents.items():
-#         pairs = all_distance_pairs(trial)
-#         within_trial_comparisons = ranking_to_pairwise_comparisons(pairs, rankings)
-#         for choice in pairs:
-#             reformatted_choice = reformat_key(choice) if to_index else choice
-#             if reformatted_choice not in choice_probabilities:
-#                 choice_probabilities[reformatted_choice] = within_trial_comparisons[choice]/5.0
-#             else:   # should only be some cases where a trial is repeated once - only once
-#                 choice_probabilities[reformatted_choice] = (within_trial_comparisons[choice]/5.0 +
-#                                                             choice_probabilities[reformatted_choice])/2.0
-#     return choice_probabilities
 
 
 def write_npy(outfilename, array):
@@ -254,9 +231,80 @@ def combine_model_npy_files_to_mat(directory, domain, subject, outdir='.', min_d
             temp['bias'][dim] = bias
             # record debiased model LLs
             temp['debiasedLL'][dim] = row['Log Likelihood'] - (best_LL - bias)
-    data['biasEstimate'] = [temp['bias'][key] for key in range(min_dim, max_dim+1)]
-    data['rawLLs'] = [temp['rawLL'][key] for key in range(min_dim, max_dim+1)]
-    data['debiasedRelativeLL'] = [temp['debiasedLL'][key] for key in range(min_dim, max_dim+1)]
+    data['biasEstimate'] = [temp['bias'][key] for key in range(min_dim, max_dim + 1)]
+    data['rawLLs'] = [temp['rawLL'][key] for key in range(min_dim, max_dim + 1)]
+    data['debiasedRelativeLL'] = [temp['debiasedLL'][key] for key in range(min_dim, max_dim + 1)]
+    savemat("{}/{}_coords_{}.mat".format(outdir, domain, subject), data)
+
+
+def combine_curvature_model_npy_files_to_mat(directory, domain, subject, dim, sigma, outdir='.'):
+    """
+    Created on Sept 25,'23
+    Add LL and biases too
+    @param directory: input dir - dir in which is a domain dir then a subject dir
+    @param subject:
+    @param outdir:
+    @param min_dim:
+    @param max_dim:
+    @return:
+    """
+
+    data = {'stim_labels': stimulus_names()}
+    bias_df = bias_dict()  # for LL bias estimation
+    rms_dists_by_dim = {}
+
+    # read the csv file containing all likelihoods and details
+    # open LL file
+    ll_file = glob.glob("{}/{}/*.csv".format(directory, domain))
+    if len(ll_file) == 0:
+        pass  # what does pass do?
+    lls = pd.read_csv(ll_file[0])
+    # for each entry find and read the corresponding file of coordinates
+    # read in row['Lambda-Mu'] = d - if d < 0 -> hyperbolic_model, else spherical_model, lambda_-d or mu_d,
+    # also read in row['Sigma']
+    # if row['Lambda-Mu'] = 0, look for ...lambda_0.npy or mu_0.npy
+    for idx, row in lls.iterrows():
+        curv_val = row['Lambda-Mu']
+        curv_type = 'lambda' if curv_val[0] == '-' else 'mu'
+        model_type = 'hyperbolic' if curv_type == 'lambda' else 'spherical'
+        model_files = glob.glob("{}/{}_data/curvature/{}/{}_{}_{}_model_coords_sigma_{}_dim_{}_{}_{}.npy".format(
+            directory, domain, subject, subject, domain, model_type, sigma, dim, curv_type, curv_val)
+        )
+        # enter coordinates for each model dimension
+        if len(model_files) > 0:
+            model_file = model_files[0]
+            points = np.array(np.load(model_file))
+            data[curv_val] = points
+            # calculate distances correctly...
+            distances = pdist(points)
+            rms_dists_by_dim[d] = np.sqrt(np.mean([d ** 2 for d in distances]))
+
+    data['rawLLs'] = []  # enter raw log-likelihoods
+    data['debiasedRelativeLL'] = []
+    data['biasEstimate'] = []
+    best_index = lls.index[lls['Model'] == 'best']
+    best_LL = lls.iloc[best_index]['Log Likelihood'].values[0]
+    data['bestModelLL'] = best_LL
+    data['metadata'] = ("README\n\nrawLLs[i] is the raw model LL for model with i dimensions\n"
+                        "biasEstimate[i] is the median bias estimated for the i-dimensional model, \n"
+                        "  based on the RMS distance: sigma\n\n"
+                        "debiasedRelativeLL = (rawLLs + biasEstimate) - bestModelLL\n"
+                        "--------------------------------------------------------------------------")
+    temp = {'bias': {}, 'debiasedLL': {}, 'rawLL': {}}
+    for idx, row in lls.iterrows():
+        model = 'dim' + str(row['Model'][:-1]) if row['Model'][-1] == 'D' else row['Model']
+        if model[0:3] == 'dim':
+            # get bias for each model LL
+            dim = int(model[3:])
+            temp['rawLL'][dim] = row['Log Likelihood']
+            bias = read_out_median_bias(
+                bias_df, dim, rms_dists_by_dim[dim], tolerance=0.5, samples=70)
+            temp['bias'][dim] = bias
+            # record debiased model LLs
+            temp['debiasedLL'][dim] = row['Log Likelihood'] - (best_LL - bias)
+    data['biasEstimate'] = [temp['bias'][key] for key in range(min_dim, max_dim + 1)]
+    data['rawLLs'] = [temp['rawLL'][key] for key in range(min_dim, max_dim + 1)]
+    data['debiasedRelativeLL'] = [temp['debiasedLL'][key] for key in range(min_dim, max_dim + 1)]
     savemat("{}/{}_coords_{}.mat".format(outdir, domain, subject), data)
 
 
@@ -339,7 +387,7 @@ def write_choice_probs_to_mat(filepath, outdir, outfilename, include_names=False
 
 
 if __name__ == '__main__':
-    subjects = ['JF'] #'MC', 'SJ', 'SAW', 'YCL', 'AJ', 'SN', 'ZK', 'BL', 'EFV', 'SA', 'NK', 'CME']   # 'JF' , 'CME',
+    subjects = ['JF']  # 'MC', 'SJ', 'SAW', 'YCL', 'AJ', 'SN', 'ZK', 'BL', 'EFV', 'SA', 'NK', 'CME']   # 'JF' , 'CME',
     for subject in subjects:
         combine_model_npy_files_to_mat(
             '/Users/suniyya/Dropbox/Research/Thesis_Work/Psychophysics_Aim1/geometric-modeling/euclidean',

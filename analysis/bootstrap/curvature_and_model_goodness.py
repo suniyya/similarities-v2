@@ -41,23 +41,6 @@ def run(args):
     degree_curvature = [0.05, 0.15, 0.25]
     degree_curvature_h = []  # -0.1, -0.2, -0.3, -0.4, -0.5, -0.6, -0.7, -0.8, -0.9, -1]
 
-    # def sample_judgments(original_judgments, num_repeats):
-    #     """
-    #     Simulate judgments based on empirical choice probabilities
-    #     :param original_judgments:
-    #     :param num_repeats:
-    #     :return:
-    #     """
-    #     sample = {}
-    #     for trial, count in original_judgments.items():
-    #         sample[trial] = 0
-    #         prob = float(count) / num_repeats
-    #         for j in range(num_repeats):
-    #             random_draw = np.random.uniform(0, 1)
-    #             if random_draw < prob:
-    #                 sample[trial] += 1
-    #     return sample
-
     def fit_model(similarity_judgments, num_repeats_dict, curvature, params, dim, start_points):
         params_copy = copy.deepcopy(params)
         num_judgments = len(similarity_judgments)
@@ -82,21 +65,6 @@ def run(args):
             ll = -1 * ll / total_num_triads
         return ll, curvature, noise, x
 
-    # def produce_surrogate_data(judgments_orig, params, batch_size=1):
-    #     """
-    #     Return a collection of surrogate judgments based on real data
-    #     @param judgments_orig:  real data
-    #     @param batch_size: size of surrogate datasets to make in a go
-    #     @param params: read in from Config file
-    #     @return:
-    #     """
-    #     batch = []
-    #     for _ in range(batch_size):
-    #         new_judgments = sample_judgments(judgments_orig, params['num_repeats'])
-    #         batch.append(new_judgments)
-    #     return batch
-
-    # surrogate_datasets = produce_surrogate_data(judgments, CONFIG, 1)
     results = {'Log Likelihood': [], 'Lambda-Mu': [], 'Curvature of Space': [], 'Sigma': [], 'Dimension': [], 'Subject': [],
                'Domain': []}
     start_euclidean = None
@@ -121,7 +89,7 @@ def run(args):
         start = coords
         # write to pandas file
         results['Lambda-Mu'].append(curvature_val)
-        results['Curvature of Space'].append(curvature_val ** 2)
+        results['Curvature of Space'].append(curvature_val * 2) # 2 mu
         results['Log Likelihood'].append(log_likelihood)
         results['Sigma'].append(sigma)
         results['Dimension'].append(dim)
@@ -147,7 +115,7 @@ def run(args):
         start = coords
         # write to pandas file
         results['Lambda-Mu'].append(curvature_val)
-        results['Curvature of Space'].append(curvature_val ** 2)
+        results['Curvature of Space'].append(curvature_val)  # curv = lambda, for hyp case
         results['Log Likelihood'].append(log_likelihood)
         results['Sigma'].append(sigma)
         results['Dimension'].append(dim)
@@ -161,7 +129,8 @@ def run(args):
 
 # NOTE: ########################################
 # Values of lambda and mu are hard-coded inside run function
-# curvature is lambda^2 and mu^2 = 1/R^2 according to definition of Gaussian curvature...
+# curvature was lambda^2 and mu^2 = 1/R^2 according to definition of Gaussian curvature...
+# now corrected to lambda for hyp and 2mu for sph
 
 print(CONFIG)
 
